@@ -218,5 +218,5 @@ class BlazePoseVideoProcessor:
 if __name__ == '__main__':
     # Initialize the BlazePoseVideoProcessor
     processor = BlazePoseVideoProcessor(input_dir='labeller_input',
-                                        eroutput_dir='classifier_input')
+                                        output_dir='classifier_input')
     processor.process_all_videos()
