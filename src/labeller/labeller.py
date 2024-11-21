@@ -10,12 +10,11 @@ from mediapipe.python.solutions.pose import PoseLandmark
 import pandas as pd
 import logging
 
-
-
 class BlazePoseVideoProcessor:
     def __init__(self, config):
         """
         Initializes the BlazePoseVideoProcessor.
+
         Args:
             config (dict): Configuration dictionary.
         """
@@ -129,7 +128,6 @@ class BlazePoseVideoProcessor:
                         continue  # Move to the next dataset_type
 
                     self.logger.info(f"Processing '{dataset_type}' videos for label '{label_name}'...")
-
                     for video_path in tqdm(video_paths, desc=f"Videos ({dataset_type}-{label_name})", unit='video'):
                         self.logger.info(f"Processing video: {video_path}")
                         self.process_video(
@@ -163,7 +161,9 @@ class BlazePoseVideoProcessor:
     def process_video(self, video_path, frames_output_dir, labels_data, label_name, joint_angles, overlay_video_path):
         """
         Processes a single video to extract frames, landmarks, and optionally joint angles.
-        Saves the output as frames and updates labels_data. Optionally saves an overlay video with landmarks and joint angles drawn.
+        Saves the output as frames and updates labels_data.
+        Optionally saves an overlay video with landmarks and joint angles drawn.
+
         Args:
             video_path (str): Path to the input video.
             frames_output_dir (str): Directory to save extracted frames and landmarks.
@@ -222,6 +222,7 @@ class BlazePoseVideoProcessor:
                     if self.save_overlay_video and overlay_writer is not None:
                         overlay_writer.write(processed_frame)
                         self.logger.debug(f"Wrote overlay frame {frame_index} to {overlay_video_path}")
+
                     pbar.update(1)
         except Exception as e:
             self.logger.exception(f"An error occurred while processing video '{video_path}': {e}")
@@ -234,7 +235,9 @@ class BlazePoseVideoProcessor:
 
     def _process_frame(self, frame, video_name, frames_output_dir, labels_data, label_name, joint_angles):
         """
-        Processes a single frame: detects pose, draws landmarks, calculates joint angles, overlays angles, and saves data.
+        Processes a single frame: detects pose, draws landmarks, calculates joint angles,
+        overlays angles, and saves data.
+
         Args:
             frame (ndarray): The video frame.
             video_name (str): Name of the video file.
@@ -242,10 +245,12 @@ class BlazePoseVideoProcessor:
             labels_data (list): List to append label data dictionaries.
             label_name (str): Label associated with the video.
             joint_angles (list): List of joint angle configurations.
+
         Returns:
             ndarray: The frame with overlays drawn (if any).
         """
         try:
+            frame_height, frame_width = frame.shape[:2]
             # Convert the frame to RGB as MediaPipe BlazePose expects RGB input
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = self.pose.process(rgb_frame)
@@ -254,7 +259,6 @@ class BlazePoseVideoProcessor:
             # Make a copy of the frame to draw overlays
             overlay_frame = frame.copy()
             frame_saved = False
-
             angles_display = {}  # To store angles for display
 
             if results.pose_landmarks:
@@ -262,20 +266,20 @@ class BlazePoseVideoProcessor:
                 self.logger.debug("Pose landmarks drawn on frame.")
 
                 # Calculate joint angles
-                angles_dict = self._calculate_joint_angles(results.pose_landmarks, joint_angles)
-                self._overlay_joint_angles(overlay_frame, results.pose_landmarks, angles_dict)
-                self.logger.debug("Joint angles calculated and overlayed.")
+                angles_dict = self._calculate_joint_angles(results.pose_landmarks, joint_angles, frame_width, frame_height)
+                self._overlay_joint_angles(overlay_frame, results.pose_landmarks, angles_dict, frame_width, frame_height)
+                self.logger.debug("Joint angles calculated and overlaid.")
 
                 # Check if angles match thresholds
                 angles_match = True
                 if self.use_joint_angles:
                     angles_match = self._check_joint_angle_thresholds(angles_dict, joint_angles)
-                    self.logger.debug(f"Joint angles match: {angles_match}")
+                self.logger.debug(f"Joint angles match: {angles_match}")
 
                 # Display match status
                 self._display_label(overlay_frame, label_name, match=angles_match)
 
-                # Save frame and labels
+                # Save frame and labels if angles match
                 if angles_match:
                     self._save_frame_and_labels(
                         frame=frame,
@@ -290,13 +294,11 @@ class BlazePoseVideoProcessor:
                     self.logger.info(f"Frame {self.global_frame_count} matched and saved.")
                 else:
                     self.logger.debug(f"Frame {self.global_frame_count} did not match label '{label_name}'.")
-
             else:
                 # If no pose is detected, log and optionally handle accordingly
                 self.logger.debug(f"No pose detected in frame {self.global_frame_count} of video '{video_name}'.")
 
             return overlay_frame
-
         except Exception as e:
             self.logger.exception(f"An error occurred while processing frame {self.global_frame_count}: {e}")
             return frame  # Return the original frame if processing fails
@@ -304,6 +306,7 @@ class BlazePoseVideoProcessor:
     def _draw_landmarks(self, frame, pose_landmarks):
         """
         Draws pose landmarks on the frame.
+
         Args:
             frame (ndarray): The video frame.
             pose_landmarks (LandmarkList): Detected pose landmarks.
@@ -325,6 +328,7 @@ class BlazePoseVideoProcessor:
     def _display_label(self, frame, label_name, match):
         """
         Displays label and match status on the frame.
+
         Args:
             frame (ndarray): The video frame.
             label_name (str): The label name.
@@ -347,13 +351,16 @@ class BlazePoseVideoProcessor:
         except Exception as e:
             self.logger.error(f"Failed to display label on frame: {e}")
 
-    def _overlay_joint_angles(self, frame, pose_landmarks, angles_dict):
+    def _overlay_joint_angles(self, frame, pose_landmarks, angles_dict, frame_width, frame_height):
         """
         Overlays joint angles on the frame near the corresponding joints.
+
         Args:
             frame (ndarray): The video frame.
             pose_landmarks (LandmarkList): Detected pose landmarks.
             angles_dict (dict): Dictionary of calculated joint angles.
+            frame_width (int): Width of the video frame.
+            frame_height (int): Height of the video frame.
         """
         try:
             for joint_name, angle in angles_dict.items():
@@ -377,9 +384,8 @@ class BlazePoseVideoProcessor:
 
                 # Get the landmark coordinates
                 try:
-                    landmark = pose_landmarks.landmark[PoseLandmark[landmark_name].value]
-                    x = int(landmark.x * frame.shape[1])
-                    y = int(landmark.y * frame.shape[0])
+                    coords = self._get_coords(pose_landmarks, landmark_name, frame_width, frame_height)
+                    x, y = int(coords[0]), int(coords[1])
 
                     # Define the text to overlay
                     angle_text = f"{joint}: {int(angle)}°"
@@ -399,21 +405,24 @@ class BlazePoseVideoProcessor:
                         1,
                         cv2.LINE_AA
                     )
-                    self.logger.debug(f"Overlayed angle '{angle_text}' at ({x + offset_x}, {y + offset_y}).")
+                    self.logger.debug(f"Overlaid angle '{angle_text}' at ({x + offset_x}, {y + offset_y}).")
                 except KeyError:
                     self.logger.warning(f"Landmark '{landmark_name}' not found for overlaying angle '{joint_name}'.")
                 except Exception as e:
                     self.logger.error(f"Failed to overlay angle '{joint_name}': {e}")
-
         except Exception as e:
             self.logger.error(f"Failed to overlay joint angles: {e}")
 
-    def _calculate_joint_angles(self, pose_landmarks, joint_angles):
+    def _calculate_joint_angles(self, pose_landmarks, joint_angles, frame_width, frame_height):
         """
         Calculates joint angles specified in joint_angles configuration.
+
         Args:
             pose_landmarks (LandmarkList): Detected pose landmarks.
             joint_angles (list): List of joint angle configurations.
+            frame_width (int): Width of the video frame.
+            frame_height (int): Height of the video frame.
+
         Returns:
             dict: Dictionary of calculated joint angles.
         """
@@ -423,54 +432,53 @@ class BlazePoseVideoProcessor:
                 name = joint.get('name')
                 side = joint.get('side', 'BOTH').upper()
                 self.logger.debug(f"Calculating angle for joint '{name}' on side '{side}'.")
-
                 angle_left = None
                 angle_right = None
 
                 # Calculate angles based on joint type
                 if name.upper() == "KNEE":
                     angle_left = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'LEFT_HIP'),
-                        self._get_coords(pose_landmarks, 'LEFT_KNEE'),
-                        self._get_coords(pose_landmarks, 'LEFT_ANKLE')
+                        self._get_coords(pose_landmarks, 'LEFT_HIP', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_KNEE', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_ANKLE', frame_width, frame_height)
                     )
                     angle_right = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'RIGHT_HIP'),
-                        self._get_coords(pose_landmarks, 'RIGHT_KNEE'),
-                        self._get_coords(pose_landmarks, 'RIGHT_ANKLE')
+                        self._get_coords(pose_landmarks, 'RIGHT_HIP', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_KNEE', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_ANKLE', frame_width, frame_height)
                     )
                 elif name.upper() == "ELBOW":
                     angle_left = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER'),
-                        self._get_coords(pose_landmarks, 'LEFT_ELBOW'),
-                        self._get_coords(pose_landmarks, 'LEFT_WRIST')
+                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_ELBOW', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_WRIST', frame_width, frame_height)
                     )
                     angle_right = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER'),
-                        self._get_coords(pose_landmarks, 'RIGHT_ELBOW'),
-                        self._get_coords(pose_landmarks, 'RIGHT_WRIST')
+                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_ELBOW', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_WRIST', frame_width, frame_height)
                     )
                 elif name.upper() == "SHOULDER":
                     angle_left = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'LEFT_ELBOW'),
-                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER'),
-                        self._get_coords(pose_landmarks, 'LEFT_HIP')
+                        self._get_coords(pose_landmarks, 'LEFT_ELBOW', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_HIP', frame_width, frame_height)
                     )
                     angle_right = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'RIGHT_ELBOW'),
-                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER'),
-                        self._get_coords(pose_landmarks, 'RIGHT_HIP')
+                        self._get_coords(pose_landmarks, 'RIGHT_ELBOW', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_HIP', frame_width, frame_height)
                     )
                 elif name.upper() == "HIP":
                     angle_left = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER'),
-                        self._get_coords(pose_landmarks, 'LEFT_HIP'),
-                        self._get_coords(pose_landmarks, 'LEFT_KNEE')
+                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_HIP', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'LEFT_KNEE', frame_width, frame_height)
                     )
                     angle_right = self._calculate_angle(
-                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER'),
-                        self._get_coords(pose_landmarks, 'RIGHT_HIP'),
-                        self._get_coords(pose_landmarks, 'RIGHT_KNEE')
+                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_HIP', frame_width, frame_height),
+                        self._get_coords(pose_landmarks, 'RIGHT_KNEE', frame_width, frame_height)
                     )
                 else:
                     self.logger.warning(f"Unknown or unsupported joint name: '{name}'. Skipping this joint.")
@@ -492,7 +500,6 @@ class BlazePoseVideoProcessor:
                     self.logger.warning(f"Invalid side '{side}' specified for joint '{name}'.")
 
             return angles_dict
-
         except Exception as e:
             self.logger.exception(f"An error occurred while calculating joint angles: {e}")
             return {}
@@ -500,9 +507,11 @@ class BlazePoseVideoProcessor:
     def _check_joint_angle_thresholds(self, angles_dict, joint_angles):
         """
         Checks if the calculated joint angles match the configured thresholds.
+
         Args:
             angles_dict (dict): Dictionary of calculated joint angles.
             joint_angles (list): List of joint angle configurations.
+
         Returns:
             bool: True if all joint angles match thresholds, False otherwise.
         """
@@ -529,7 +538,7 @@ class BlazePoseVideoProcessor:
                     angle_left = angles_dict.get(f"{name}_LEFT")
                     angle_right = angles_dict.get(f"{name}_RIGHT")
                     if (angle_left is None or not (min_angle <= angle_left <= max_angle) or
-                            angle_right is None or not (min_angle <= angle_right <= max_angle)):
+                        angle_right is None or not (min_angle <= angle_right <= max_angle)):
                         self.logger.debug(f"One or both {name} angles out of thresholds.")
                         return False
                 else:
@@ -539,23 +548,19 @@ class BlazePoseVideoProcessor:
             # All joints passed the threshold checks
             self.logger.debug("All joint angles matched the thresholds.")
             return True
-
         except Exception as e:
             self.logger.exception(f"An error occurred while checking joint angle thresholds: {e}")
             return False
 
-    def _get_coords(self, pose_landmarks, landmark_name):
-        """
-        Retrieves the coordinates of a specified landmark.
-        Args:
-            pose_landmarks (LandmarkList): Detected pose landmarks.
-            landmark_name (str): Name of the landmark.
-        Returns:
-            np.ndarray or None: 3D coordinates of the landmark or None if not found.
-        """
+    def _get_coords(self, pose_landmarks, landmark_name, frame_width, frame_height):
         try:
             landmark = pose_landmarks.landmark[PoseLandmark[landmark_name.upper()].value]
-            coords = np.array([landmark.x, landmark.y, landmark.z])
+            x = landmark.x * frame_width
+            y = landmark.y * frame_height
+            # z = landmark.z * frame_width  # Uncomment if you want to scale z-coordinate
+            z = landmark.z  # Using the normalized z-coordinate as provided
+            coords = np.array([x, y])
+            # coords = np.array([x, y, z])  # Use this if including z in calculations
             self.logger.debug(f"Retrieved coordinates for {landmark_name}: {coords}")
             return coords
         except KeyError:
@@ -566,8 +571,7 @@ class BlazePoseVideoProcessor:
             return None
 
     def _calculate_angle(self, pointA, pointB, pointC):
-        """
-        Calculates the angle at pointB formed by the line segments BA and BC.
+        """ Calculates the angle at pointB formed by the line segments BA and BC.
         Args:
             pointA (np.ndarray): Coordinates of point A.
             pointB (np.ndarray): Coordinates of point B.
@@ -579,31 +583,31 @@ class BlazePoseVideoProcessor:
             if pointA is None or pointB is None or pointC is None:
                 self.logger.warning("One or more points are None. Cannot calculate angle.")
                 return None
+            # Correct vector definitions
+            BA = pointA - pointB  # Vector from B to A
+            BC = pointC - pointB  # Vector from B to C
 
-            BA = pointA - pointB
-            BC = pointC - pointB
-
+            # Compute the angle between BA and BC
             norm_BA = np.linalg.norm(BA)
             norm_BC = np.linalg.norm(BC)
             if norm_BA == 0 or norm_BC == 0:
                 self.logger.warning("Zero length vector encountered. Cannot calculate angle.")
                 return None
-
             cosine_angle = np.dot(BA, BC) / (norm_BA * norm_BC)
             cosine_angle = np.clip(cosine_angle, -1.0, 1.0)  # Ensure within valid range
             angle_rad = np.arccos(cosine_angle)
             angle_deg = np.degrees(angle_rad)
-            self.logger.debug(f"Calculated angle: {angle_deg} degrees.")
-            return angle_deg
-
+            joint_angle = angle_deg  # Use angle directly, as it's now correct
+            self.logger.debug(f"Calculated joint angle: {joint_angle} degrees.")
+            return joint_angle
         except Exception as e:
             self.logger.exception(f"Failed to calculate angle: {e}")
             return None
 
-    def _save_frame_and_labels(self, frame, pose_landmarks, label_name, video_name, frames_output_dir, labels_data,
-                               joint_angles=None):
+    def _save_frame_and_labels(self, frame, pose_landmarks, label_name, video_name, frames_output_dir, labels_data, joint_angles=None):
         """
         Saves the frame image and appends label data including the landmarks.
+
         Args:
             frame (ndarray): The video frame.
             pose_landmarks (LandmarkList): Detected pose landmarks.
@@ -627,7 +631,7 @@ class BlazePoseVideoProcessor:
             for idx, lm in enumerate(pose_landmarks.landmark):
                 label_entry[f'x{idx + 1}'] = lm.x
                 label_entry[f'y{idx + 1}'] = lm.y
-                label_entry[f'z{idx + 1}'] = lm.z
+                label_entry[f'z{idx + 1}'] = lm.z  # Include z-coordinate in labels data
 
             # Add joint angles to the label_entry if available
             if joint_angles:
@@ -637,7 +641,6 @@ class BlazePoseVideoProcessor:
             # Append the label data to the labels_data list
             labels_data.append(label_entry)
             self.logger.debug(f"Appended label data for frame {self.global_frame_count}.")
-
         except Exception as e:
             self.logger.exception(f"Failed to save frame and labels for frame {self.global_frame_count}: {e}")
 
@@ -656,7 +659,6 @@ def main():
 
         processor = BlazePoseVideoProcessor(config)
         processor.process_all_videos()
-
     except Exception as e:
         # Since logging is initialized inside the class, we need to set up a temporary logger here
         logging.basicConfig(level=logging.ERROR)
