@@ -17,7 +17,7 @@ class BlazePoseVideoProcessor:
         Args:
             config (dict): Configuration dictionary.
         """
-        self.log_dir = config.get('log_dir', './logs')
+        self.log_dir = config.get('log_dir', 'logs')
         self.log_level = config.get('log_level', 'INFO').upper()
         self._setup_logging()
         self.logger.info("Initializing BlazePoseVideoProcessor...")
@@ -584,15 +584,13 @@ class BlazePoseVideoProcessor:
 
     def _save_frame_and_labels(self, frame, pose_landmarks, label_name, video_name, frames_output_dir, labels_data,
                                joint_angles=None):
-        """
-        Saves the frame image, landmarks, and appends label data.
-
+        """ Saves the frame image and appends label data including the landmarks.
         Args:
             frame (ndarray): The video frame.
             pose_landmarks (LandmarkList): Detected pose landmarks.
             label_name (str): Label associated with the frame.
             video_name (str): Name of the video file.
-            frames_output_dir (str): Directory to save frames and landmarks.
+            frames_output_dir (str): Directory to save frames.
             labels_data (list): List to append label data dictionaries.
             joint_angles (dict, optional): Dictionary of joint angles.
         """
@@ -603,31 +601,23 @@ class BlazePoseVideoProcessor:
             cv2.imwrite(frame_path, frame)
             self.logger.debug(f"Saved frame image: {frame_path}")
 
-            # Save the landmarks as a flattened list
-            landmarks_array = np.array([[lm.x, lm.y, lm.z] for lm in pose_landmarks.landmark]).flatten()
-            landmarks_filename = f'{video_name}_landmarks_{self.global_frame_count:06d}.npy'
-            landmarks_path = os.path.join(frames_output_dir, landmarks_filename)
-            np.save(landmarks_path, landmarks_array)
-            self.logger.debug(f"Saved landmarks array: {landmarks_path}")
+            # Prepare the label data dictionary with landmarks
+            label_entry = {'frame_filename': frame_filename, 'movement_label': label_name}
 
-            # Prepare the label data dictionary
-            label_entry = {
-                'frame_filename': frame_filename,
-                'landmarks_filename': landmarks_filename,
-                'label': label_name
-            }
-
-            # If joint angles are provided, include them in the label entry
-            if joint_angles:
-                for joint, angle in joint_angles.items():
-                    label_entry[joint] = angle
-                self.logger.debug(f"Added joint angles to label entry: {joint_angles}")
+            # Add the landmarks to the label_entry
+            for idx, lm in enumerate(pose_landmarks.landmark):
+                label_entry[f'x{idx + 1}'] = lm.x
+                label_entry[f'y{idx + 1}'] = lm.y
+                label_entry[f'z{idx + 1}'] = lm.z
 
             # Append the label data to the labels_data list
             labels_data.append(label_entry)
             self.logger.debug(f"Appended label data for frame {self.global_frame_count}.")
+
         except Exception as e:
             self.logger.exception(f"Failed to save frame and labels for frame {self.global_frame_count}: {e}")
+
+
 
     def _overlay_joint_angles(self, frame, pose_landmarks, angles_dict, match=True):
         """
@@ -689,7 +679,7 @@ def main():
     """
     try:
         # Centralize configuration in a YAML file
-        CONFIG_FILEPATH = 'config/labeller_config.yaml'
+        CONFIG_FILEPATH = './config/labeller_config.yaml'
         if not os.path.exists(CONFIG_FILEPATH):
             raise FileNotFoundError(f"Configuration file not found: {CONFIG_FILEPATH}")
 

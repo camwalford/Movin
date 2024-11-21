@@ -528,8 +528,8 @@ def main():
 
     # model.predict_on_test_data(test_data_dir=test_data_dir)
 
-    input_video_path = '/classifier_input/test/testplayback.mp4'
-    output_video_path = './classifier_output/test/test_predictions.mp4'  # Optional
+    input_video_path = 'classifier/classifier_input/test/testplayback.mp4'
+    output_video_path = 'classifier/classifier_output/test/test_predictions.mp4'  # Optional
     model.predict_on_video(
         video_path=input_video_path,
         display=True,
