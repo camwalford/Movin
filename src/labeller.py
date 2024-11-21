@@ -2,221 +2,708 @@ import cv2
 import mediapipe as mp
 import os
 import numpy as np
-import csv
 from glob import glob
 from datetime import datetime
+import yaml
+from mediapipe.python.solutions.pose import PoseLandmark
+import pandas as pd
+import logging
+
 
 class BlazePoseVideoProcessor:
-    def __init__(self, input_dir='./input', output_dir='./output', min_detection_confidence=0.5):
+    def __init__(self, config):
         """
         Initializes the BlazePoseVideoProcessor.
-
         Args:
-            input_dir (str): Path to the input directory containing 'train' and 'test' subdirectories.
-            output_dir (str): Path to the output directory.
-            min_detection_confidence (float): Minimum detection confidence for pose estimation.
+            config (dict): Configuration dictionary.
         """
-        # Initialize MediaPipe BlazePose
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self.min_detection_confidence = min_detection_confidence
-        self.pose = mp.solutions.pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
-            enable_segmentation=False,
-            min_detection_confidence=min_detection_confidence
-        )
-        # Initialize global frame count
-        self.global_frame_count = 0
+        self.log_dir = config.get('log_dir', './logs')
+        self.log_level = config.get('log_level', 'INFO').upper()
+        self._setup_logging()
+        self.logger.info("Initializing BlazePoseVideoProcessor...")
+
+        self.input_dir = config['input_dir']
+        self.output_dir = config['output_dir']
+        self.logger.info(f"Input directory: {self.input_dir}")
+        self.logger.info(f"Output directory: {self.output_dir}")
+        self.logger.debug(f"Configuration: {config}")
+
+        # Initialize MediaPipe BlazePose with settings
+        try:
+            self.pose = mp.solutions.pose.Pose(**config['blaze_settings'])
+            self.logger.info("MediaPipe BlazePose initialized successfully.")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize MediaPipe BlazePose: {e}")
+            raise e
+
+        self.labels = config['movement_labels']
+        self.multi_label = config.get('multi_label', False)
+        self.target_label = config.get('target_label', None)
+        self.use_joint_angles = config.get('use_joint_angles', False)
+        self.global_frame_count = 0  # Counter for frames processed
+        self.save_overlay_video = config.get('save_overlay_video', False)
+
+        self.logger.info("BlazePoseVideoProcessor initialized successfully.")
+
+    def _setup_logging(self):
+        """
+        Sets up logging for the processor.
+        """
+        os.makedirs(self.log_dir, exist_ok=True)
+        log_filename = datetime.now().strftime('%Y%m%d_%H%M%S') + '.log'
+        log_filepath = os.path.join(self.log_dir, log_filename)
+
+        # Create a dedicated logger for this class
+        self.logger = logging.getLogger('BlazePoseVideoProcessor')
+        self.logger.setLevel(getattr(logging, self.log_level, logging.INFO))
+
+        # Prevent adding multiple handlers if already present
+        if not self.logger.handlers:
+            # File handler
+            file_handler = logging.FileHandler(log_filepath)
+            file_handler.setLevel(getattr(logging, self.log_level, logging.INFO))
+
+            # Stream handler (console)
+            stream_handler = logging.StreamHandler()
+            stream_handler.setLevel(getattr(logging, self.log_level, logging.INFO))
+
+            # Formatter
+            formatter = logging.Formatter(
+                '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            file_handler.setFormatter(formatter)
+            stream_handler.setFormatter(formatter)
+
+            # Add handlers to the logger
+            self.logger.addHandler(file_handler)
+            self.logger.addHandler(stream_handler)
+
+        self.logger.debug("Logging has been set up.")
 
     def process_all_videos(self):
-        # Process videos in both 'train' and 'test' directories
-        for dataset_type in ['train', 'test']:
-            input_dataset_dir = os.path.join(self.input_dir, dataset_type)
-            output_dataset_dir = os.path.join(self.output_dir, dataset_type)
+        """
+        Processes all videos in the input directory and saves outputs to Parquet files.
+        """
+        try:
+            # Extract only the target label from the movement labels dictionary if multi_label is disabled
+            if not self.multi_label and self.target_label:
+                self.labels = {self.target_label: self.labels.get(self.target_label, {})}
+                self.logger.info(f"Multi-label disabled. Target label set to: {self.target_label}")
+            elif not self.multi_label and not self.target_label:
+                self.logger.warning("Multi-label is disabled but no target_label is specified.")
 
-            # Create timestamped subdirectory in the output dataset directory
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_dataset_dir = os.path.join(output_dataset_dir, timestamp)
-            frames_output_dir = os.path.join(output_dataset_dir, 'frames')
-            labels_csv_path = os.path.join(output_dataset_dir, 'labels.csv')
+            for label_name, label_data in self.labels.items():
+                joint_angles = label_data.get('joints', [])
+                self.logger.info(f"Processing label: {label_name} with {len(joint_angles)} joint angles.")
 
-            # Ensure output directories exist
-            os.makedirs(frames_output_dir, exist_ok=True)
+                # Process videos in both 'train' and 'test' directories
+                for dataset_type in ['train', 'test']:
+                    input_dataset_dir = os.path.join(self.input_dir, dataset_type, label_name)
+                    output_dataset_dir = os.path.join(self.output_dir, dataset_type, label_name)
 
-            # Initialize the CSV file with headers
-            with open(labels_csv_path, 'w', newline='') as csvfile:
-                csv_writer = csv.writer(csvfile)
-                csv_writer.writerow(['filename', 'labels'])
+                    # Create timestamped subdirectory in the output dataset directory
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    output_dataset_dir = os.path.join(output_dataset_dir, timestamp)
+                    frames_output_dir = os.path.join(output_dataset_dir, 'frames')
+                    labels_parquet_path = os.path.join(output_dataset_dir, 'labels.parquet')
+                    overlay_video_path = os.path.join(output_dataset_dir, f'overlay_{label_name}.mp4')
 
-            # Process videos in the input dataset directory
-            video_paths = glob(os.path.join(input_dataset_dir, '*.mp4'))
-            if not video_paths:
-                print(f"No .mp4 files found in {input_dataset_dir}")
-                continue  # Move to the next dataset_type
+                    # Ensure output directories exist
+                    os.makedirs(frames_output_dir, exist_ok=True)
+                    self.logger.debug(f"Created output directories at {output_dataset_dir}")
 
-            print(f"Processing '{dataset_type}' videos...")
+                    # Initialize labels_data list
+                    labels_data = []
 
-            for video_path in video_paths:
-                print(f"Processing video: {video_path}")
-                self.process_video(
-                    video_path=video_path,
+                    # Initialize video writer if saving overlay video
+                    overlay_writer = None
+                    if self.save_overlay_video:
+                        # We'll initialize the writer inside process_video to handle multiple videos
+                        self.logger.info("Overlay video saving is enabled.")
+
+                    # Process videos in the input dataset directory
+                    video_paths = glob(os.path.join(input_dataset_dir, '*.mp4'))
+                    if not video_paths:
+                        self.logger.warning(f"No .mp4 files found in {input_dataset_dir}")
+                        continue  # Move to the next dataset_type
+
+                    self.logger.info(f"Processing '{dataset_type}' videos for label '{label_name}'...")
+
+                    for video_path in video_paths:
+                        self.logger.info(f"Processing video: {video_path}")
+                        self.process_video(
+                            video_path=video_path,
+                            frames_output_dir=frames_output_dir,
+                            labels_data=labels_data,
+                            label_name=label_name,
+                            joint_angles=joint_angles,
+                            overlay_video_path=overlay_video_path
+                        )
+
+                    # After processing all videos for this dataset_type and label_name, save labels_data
+                    if labels_data:
+                        df_labels = pd.DataFrame(labels_data)
+                        try:
+                            df_labels.to_parquet(labels_parquet_path, index=False)
+                            self.logger.info(f"Saved labels to {labels_parquet_path}")
+                        except Exception as e:
+                            self.logger.error(f"Failed to save Parquet file {labels_parquet_path}: {e}")
+                    else:
+                        self.logger.warning(f"No labels data collected for {label_name} in {dataset_type}.")
+
+                    # Note: Overlay video handling is managed within process_video
+
+                self.logger.info(f"Finished processing label '{label_name}'.")
+
+            self.pose.close()
+            self.logger.info("Processed all videos successfully.")
+
+        except Exception as e:
+            self.logger.exception(f"An error occurred while processing videos: {e}")
+
+    def process_video(self, video_path, frames_output_dir, labels_data, label_name, joint_angles, overlay_video_path):
+        """
+        Processes a single video to extract frames, landmarks, and optionally joint angles.
+        Saves the output as frames and updates labels_data.
+        Optionally saves an overlay video with landmarks and joint angles drawn.
+
+        Args:
+            video_path (str): Path to the input video.
+            frames_output_dir (str): Directory to save extracted frames and landmarks.
+            labels_data (list): List to append label data dictionaries.
+            label_name (str): Label associated with the video.
+            joint_angles (list): List of joint angle configurations.
+            overlay_video_path (str): Path to save the overlay video.
+        """
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            self.logger.error(f"Failed to open video: {video_path}")
+            return
+
+        video_name = os.path.splitext(os.path.basename(video_path))[0]
+        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30  # Default to 30 if FPS not found
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.logger.debug(
+            f"Video '{video_name}' opened: {frame_width}x{frame_height} at {fps} FPS with {total_frames} frames.")
+
+        # Initialize overlay video writer if enabled
+        overlay_writer = None
+        if self.save_overlay_video:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                overlay_writer = cv2.VideoWriter(overlay_video_path, fourcc, fps, (frame_width, frame_height))
+                self.logger.debug(f"Overlay video writer initialized at {overlay_video_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize overlay video writer: {e}")
+
+        frame_index = 0
+        try:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    self.logger.debug(f"End of video reached: {video_path}")
+                    break  # End of video
+
+                frame_index += 1
+                self.global_frame_count += 1
+                self.logger.debug(f"Processing frame {frame_index}/{total_frames} of video '{video_name}'.")
+
+                processed_frame = self._process_frame(
+                    frame=frame,
+                    video_name=video_name,
                     frames_output_dir=frames_output_dir,
-                    labels_csv_path=labels_csv_path
+                    labels_data=labels_data,
+                    label_name=label_name,
+                    joint_angles=joint_angles
                 )
 
-        self.pose.close()
-        print("Processed all videos.")
+                # Write the overlay frame to video if enabled
+                if self.save_overlay_video and overlay_writer is not None:
+                    overlay_writer.write(processed_frame)
+                    self.logger.debug(f"Wrote overlay frame {frame_index} to {overlay_video_path}")
 
-    def process_video(self, video_path, frames_output_dir, labels_csv_path):
-        # Process a single video
-        cap = cv2.VideoCapture(video_path)
-        video_name = os.path.splitext(os.path.basename(video_path))[0]
+        except Exception as e:
+            self.logger.exception(f"An error occurred while processing video '{video_path}': {e}")
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                print(f"Finished processing video: {video_path}")
-                break
+        finally:
+            cap.release()
+            self.logger.debug(f"Released video capture for {video_path}")
+            if overlay_writer is not None:
+                overlay_writer.release()
+                self.logger.debug(f"Released overlay video writer for {overlay_video_path}")
 
-            self.global_frame_count += 1
-            processed_frame = self._process_frame(frame, video_name, frames_output_dir, labels_csv_path)
+    def _process_frame(self, frame, video_name, frames_output_dir, labels_data, label_name, joint_angles):
+        """
+        Processes a single frame: detects pose, draws landmarks, calculates joint angles, overlays angles, and saves data.
 
-            # Display the frame with landmarks (optional)
-            # cv2.imshow('BlazePose Processed Video', processed_frame)
-            # if cv2.waitKey(10) & 0xFF == ord('q'):
-            #     break
+        Args:
+            frame (ndarray): The video frame.
+            video_name (str): Name of the video file.
+            frames_output_dir (str): Directory to save frames and landmarks.
+            labels_data (list): List to append label data dictionaries.
+            label_name (str): Label associated with the video.
+            joint_angles (list): List of joint angle configurations.
 
-        cap.release()
-        # cv2.destroyAllWindows()  # Commented out since display is optional
+        Returns:
+            ndarray: The frame with overlays drawn (if any).
+        """
+        try:
+            # Convert the frame to RGB as MediaPipe BlazePose expects RGB input
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self.pose.process(rgb_frame)
+            self.logger.debug("Pose processing completed for current frame.")
 
-    def _process_frame(self, frame, video_name, frames_output_dir, labels_csv_path):
-        # Convert the frame to RGB as MediaPipe BlazePose expects RGB input
-        h, w, _ = frame.shape
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.pose.process(rgb_frame)
+            # Make a copy of the frame to draw overlays
+            overlay_frame = frame.copy()
+            frame_saved = False
+            angles_display = {}  # To store angles for display
 
-        # Make a copy of the original frame before drawing landmarks
-        original_frame = frame.copy()
+            if results.pose_landmarks:
+                self._draw_landmarks(overlay_frame, results.pose_landmarks)
+                self.logger.debug("Pose landmarks drawn on frame.")
 
-        if results.pose_landmarks:
-            self._draw_landmarks(frame, results.pose_landmarks)
-            labels = self._calculate_angles_and_get_labels(results.pose_landmarks, w, h)
-            # Save the original frame and labels
-            self._save_frame_and_labels(
-                frame=original_frame,
-                labels=labels,
-                video_name=video_name,
-                frames_output_dir=frames_output_dir,
-                labels_csv_path=labels_csv_path
-            )
-        else:
-            # If no pose is detected, you may choose to label accordingly or skip the frame
-            pass
+                if self.use_joint_angles:
+                    # Calculate joint angles and check thresholds
+                    angles_match, angles_dict = self._check_joint_angles(results.pose_landmarks, joint_angles)
+                    self.logger.debug(f"Joint angles match: {angles_match}")
 
-        return frame  # This frame has landmarks drawn on it
+                    if angles_match:
+                        # Indicate that this frame matches the label
+                        self._display_label(overlay_frame, label_name, match=True)
+                        # Overlay joint angles on the frame
+                        self._overlay_joint_angles(overlay_frame, results.pose_landmarks, angles_dict)
+                        # Save frame and labels
+                        self._save_frame_and_labels(
+                            frame=frame,
+                            pose_landmarks=results.pose_landmarks,
+                            label_name=label_name,
+                            video_name=video_name,
+                            frames_output_dir=frames_output_dir,
+                            labels_data=labels_data,
+                            joint_angles=angles_dict
+                        )
+                        frame_saved = True
+                        self.logger.info(f"Frame {self.global_frame_count} matched and saved.")
+                    else:
+                        # Indicate no match on the overlay
+                        self._display_label(overlay_frame, label_name, match=False)
+                        self.logger.debug(f"Frame {self.global_frame_count} did not match label '{label_name}'.")
+                        # Optionally, still overlay angles even if not matched
+                        self._overlay_joint_angles(overlay_frame, results.pose_landmarks, angles_dict, match=False)
+                else:
+                    # Indicate that this frame is processed without angle checks
+                    self._display_label(overlay_frame, label_name, match=True)
+                    # Overlay joint angles if needed (not applicable here)
+                    # Save frame and labels
+                    self._save_frame_and_labels(
+                        frame=frame,
+                        pose_landmarks=results.pose_landmarks,
+                        label_name=label_name,
+                        video_name=video_name,
+                        frames_output_dir=frames_output_dir,
+                        labels_data=labels_data
+                    )
+                    frame_saved = True
+                    self.logger.info(f"Frame {self.global_frame_count} saved without angle checks.")
+            else:
+                # If no pose is detected, log and optionally handle accordingly
+                self.logger.debug(f"No pose detected in frame {self.global_frame_count} of video '{video_name}'.")
+
+            return overlay_frame
+        except Exception as e:
+            self.logger.exception(f"An error occurred while processing frame {self.global_frame_count}: {e}")
+            return frame  # Return the original frame if processing fails
 
     def _draw_landmarks(self, frame, pose_landmarks):
-        # Draw pose landmarks on the frame
-        mp.solutions.drawing_utils.draw_landmarks(
-            frame,
-            pose_landmarks,
-            mp.solutions.pose.POSE_CONNECTIONS,
-            landmark_drawing_spec=mp.solutions.drawing_utils.DrawingSpec(
-                color=(0, 255, 0), thickness=2, circle_radius=2),
-            connection_drawing_spec=mp.solutions.drawing_utils.DrawingSpec(
-                color=(0, 0, 255), thickness=2, circle_radius=2)
-        )
+        """
+        Draws pose landmarks on the frame.
 
-    def _calculate_angles_and_get_labels(self, pose_landmarks, w, h):
-        # Extract coordinates of key landmarks for angle calculation
-        def get_coords(landmark):
-            return np.array([landmark.x * w, landmark.y * h])
+        Args:
+            frame (ndarray): The video frame.
+            pose_landmarks (LandmarkList): Detected pose landmarks.
+        """
+        try:
+            mp.solutions.drawing_utils.draw_landmarks(
+                frame,
+                pose_landmarks,
+                mp.solutions.pose.POSE_CONNECTIONS,
+                landmark_drawing_spec=mp.solutions.drawing_utils.DrawingSpec(
+                    color=(0, 255, 0),
+                    thickness=2,
+                    circle_radius=2),
+                connection_drawing_spec=mp.solutions.drawing_utils.DrawingSpec(
+                    color=(0, 0, 255),
+                    thickness=2,
+                    circle_radius=2)
+            )
+            self.logger.debug("Pose landmarks successfully drawn.")
+        except Exception as e:
+            self.logger.error(f"Failed to draw landmarks: {e}")
 
-        # Initialize list of contracted muscles
-        contracted_muscles = []
+    def _display_label(self, frame, label_name, match):
+        """
+        Displays label and match status on the frame.
 
-        # Left Side Angles
-        left_shoulder = get_coords(pose_landmarks.landmark[11])
-        left_elbow = get_coords(pose_landmarks.landmark[13])
-        left_wrist = get_coords(pose_landmarks.landmark[15])
-        left_hip = get_coords(pose_landmarks.landmark[23])
+        Args:
+            frame (ndarray): The video frame.
+            label_name (str): The label name.
+            match (bool): Whether the frame matches the label.
+        """
+        try:
+            text = f"Label: {label_name} - {'Matched' if match else 'Not Matched'}"
+            color = (0, 255, 0) if match else (0, 0, 255)
+            cv2.putText(
+                frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                0.8, color, 2, cv2.LINE_AA
+            )
+            self.logger.debug(f"Displayed label on frame: {text}")
+        except Exception as e:
+            self.logger.error(f"Failed to display label on frame: {e}")
 
-        left_elbow_angle = self._calculate_angle(left_shoulder, left_elbow, left_wrist)
-        left_shoulder_angle = self._calculate_angle(left_hip, left_shoulder, left_elbow)
+    def _overlay_joint_angles(self, frame, pose_landmarks, angles_dict, match=True):
+        """
+        Overlays joint angles on the frame near the corresponding joints.
 
-        # Determine contracted muscles based on angles
-        # Left Biceps
-        if left_elbow_angle < 130:
-            contracted_muscles.append('left_biceps')
-        # Left Triceps
-        else:
-            contracted_muscles.append('left_triceps')
+        Args:
+            frame (ndarray): The video frame.
+            pose_landmarks (LandmarkList): Detected pose landmarks.
+            angles_dict (dict): Dictionary of joint angles.
+            match (bool): Whether the frame matches the label.
+        """
+        try:
+            for joint_name, angle in angles_dict.items():
+                # Determine the landmark to position the angle text
+                # This example places the text near the middle joint
+                # Adjust as needed for better positioning
+                if "KNEE" in joint_name:
+                    landmark_name = 'RIGHT_KNEE' if 'RIGHT' in joint_name else 'LEFT_KNEE'
+                elif "ELBOW" in joint_name:
+                    landmark_name = 'RIGHT_ELBOW' if 'RIGHT' in joint_name else 'LEFT_ELBOW'
+                elif "SHOULDER" in joint_name:
+                    landmark_name = 'RIGHT_SHOULDER' if 'RIGHT' in joint_name else 'LEFT_SHOULDER'
+                elif "HIP" in joint_name:
+                    landmark_name = 'RIGHT_HIP' if 'RIGHT' in joint_name else 'LEFT_HIP'
+                else:
+                    # Default to a central landmark if joint is unknown
+                    landmark_name = 'NOSE'
 
-        # # Left Deltoid
-        # if left_shoulder_angle < 90:
-        #     contracted_muscles.append('left_deltoid')
+                # Get the landmark coordinates
+                try:
+                    landmark = pose_landmarks.landmark[PoseLandmark[landmark_name].value]
+                    x = int(landmark.x * frame.shape[1])
+                    y = int(landmark.y * frame.shape[0])
 
-        # Right Side Angles
-        right_shoulder = get_coords(pose_landmarks.landmark[12])
-        right_elbow = get_coords(pose_landmarks.landmark[14])
-        right_wrist = get_coords(pose_landmarks.landmark[16])
-        right_hip = get_coords(pose_landmarks.landmark[24])
+                    # Define the text to overlay
+                    angle_text = f"{joint_name}: {int(angle)}°"
 
-        right_elbow_angle = self._calculate_angle(right_shoulder, right_elbow, right_wrist)
-        right_shoulder_angle = self._calculate_angle(right_hip, right_shoulder, right_elbow)
+                    # Define position offset
+                    offset_x = 20
+                    offset_y = -20
 
-        # Right Biceps
-        if right_elbow_angle < 130:
-            contracted_muscles.append('right_biceps')
-        # Right Triceps
-        else:
-            contracted_muscles.append('right_triceps')
+                    # Put the text on the frame
+                    cv2.putText(
+                        frame, angle_text, (x + offset_x, y + offset_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (255, 0, 0) if match else (0, 255, 255), 1, cv2.LINE_AA
+                    )
+                    self.logger.debug(f"Overlayed angle '{angle_text}' at ({x + offset_x}, {y + offset_y}).")
+                except KeyError:
+                    self.logger.warning(f"Landmark '{landmark_name}' not found for overlaying angle '{joint_name}'.")
+                except Exception as e:
+                    self.logger.error(f"Failed to overlay angle '{joint_name}': {e}")
+        except Exception as e:
+            self.logger.error(f"Failed to overlay joint angles: {e}")
 
-        # # Right Deltoid
-        # if right_shoulder_angle < 90:
-        #     contracted_muscles.append('right_deltoid')
+    def _check_joint_angles(self, pose_landmarks, joint_angles):
+        """
+        Checks if the calculated joint angles match the configured thresholds.
 
-        # Return the list of contracted muscles
-        labels = ','.join(contracted_muscles)
+        Args:
+            pose_landmarks (LandmarkList): Detected pose landmarks.
+            joint_angles (list): List of joint angle configurations.
 
-        return {
-            'labels': labels
-        }
+        Returns:
+            tuple:
+                bool: True if all joint angles match, False otherwise.
+                dict: Dictionary of calculated joint angles.
+        """
+        try:
+            angles_dict = {}
+            for joint in joint_angles:
+                name = joint.get('name')
+                side = joint.get('side', 'BOTH').upper()
+                min_angle = joint.get('min_angle')
+                max_angle = joint.get('max_angle')
+
+                self.logger.debug(
+                    f"Checking joint '{name}' on side '{side}' with angle thresholds [{min_angle}, {max_angle}].")
+
+                angle_left = None
+                angle_right = None
+
+                # Calculate angles based on joint type
+                if name.upper() == "KNEE":
+                    angle_left = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'LEFT_HIP'),
+                        self._get_coords(pose_landmarks, 'LEFT_KNEE'),
+                        self._get_coords(pose_landmarks, 'LEFT_ANKLE')
+                    )
+                    angle_right = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'RIGHT_HIP'),
+                        self._get_coords(pose_landmarks, 'RIGHT_KNEE'),
+                        self._get_coords(pose_landmarks, 'RIGHT_ANKLE')
+                    )
+                    self.logger.debug(f"Calculated angles - Left Knee: {angle_left}, Right Knee: {angle_right}")
+                elif name.upper() == "ELBOW":
+                    angle_left = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER'),
+                        self._get_coords(pose_landmarks, 'LEFT_ELBOW'),
+                        self._get_coords(pose_landmarks, 'LEFT_WRIST')
+                    )
+                    angle_right = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER'),
+                        self._get_coords(pose_landmarks, 'RIGHT_ELBOW'),
+                        self._get_coords(pose_landmarks, 'RIGHT_WRIST')
+                    )
+                    self.logger.debug(f"Calculated angles - Left Elbow: {angle_left}, Right Elbow: {angle_right}")
+                elif name.upper() == "SHOULDER":
+                    angle_left = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'LEFT_ELBOW'),
+                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER'),
+                        self._get_coords(pose_landmarks, 'LEFT_HIP')
+                    )
+                    angle_right = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'RIGHT_ELBOW'),
+                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER'),
+                        self._get_coords(pose_landmarks, 'RIGHT_HIP')
+                    )
+                    self.logger.debug(f"Calculated angles - Left Shoulder: {angle_left}, Right Shoulder: {angle_right}")
+                elif name.upper() == "HIP":
+                    angle_left = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'LEFT_SHOULDER'),
+                        self._get_coords(pose_landmarks, 'LEFT_HIP'),
+                        self._get_coords(pose_landmarks, 'LEFT_KNEE')
+                    )
+                    angle_right = self._calculate_angle(
+                        self._get_coords(pose_landmarks, 'RIGHT_SHOULDER'),
+                        self._get_coords(pose_landmarks, 'RIGHT_HIP'),
+                        self._get_coords(pose_landmarks, 'RIGHT_KNEE')
+                    )
+                    self.logger.debug(f"Calculated angles - Left Hip: {angle_left}, Right Hip: {angle_right}")
+                else:
+                    self.logger.warning(f"Unknown or unsupported joint name: '{name}'. Skipping this joint.")
+                    return False, {}
+
+                # Validate angles based on side
+                if side == 'LEFT':
+                    if angle_left is None or not (min_angle <= angle_left <= max_angle):
+                        self.logger.debug(f"Left {name} angle {angle_left} out of thresholds.")
+                        return False, {}
+                    angles_dict[f"{name}_LEFT"] = angle_left
+                elif side == 'RIGHT':
+                    if angle_right is None or not (min_angle <= angle_right <= max_angle):
+                        self.logger.debug(f"Right {name} angle {angle_right} out of thresholds.")
+                        return False, {}
+                    angles_dict[f"{name}_RIGHT"] = angle_right
+                elif side == 'BOTH':
+                    if (angle_left is None or angle_right is None or
+                            not (min_angle <= angle_left <= max_angle) or
+                            not (min_angle <= angle_right <= max_angle)):
+                        self.logger.debug(f"One or both {name} angles out of thresholds.")
+                        return False, {}
+                    angles_dict[f"{name}_LEFT"] = angle_left
+                    angles_dict[f"{name}_RIGHT"] = angle_right
+                else:
+                    self.logger.warning(f"Invalid side '{side}' specified for joint '{name}'.")
+                    return False, {}
+            # All joints passed the threshold checks
+            self.logger.debug("All joint angles matched the thresholds.")
+            return True, angles_dict
+        except Exception as e:
+            self.logger.exception(f"An error occurred while checking joint angles: {e}")
+            return False, {}
+
+    def _get_coords(self, pose_landmarks, landmark_name):
+        """
+        Retrieves the coordinates of a specified landmark.
+
+        Args:
+            pose_landmarks (LandmarkList): Detected pose landmarks.
+            landmark_name (str): Name of the landmark.
+
+        Returns:
+            np.ndarray or None: 3D coordinates of the landmark or None if not found.
+        """
+        try:
+            landmark = pose_landmarks.landmark[PoseLandmark[landmark_name.upper()].value]
+            coords = np.array([landmark.x, landmark.y, landmark.z])
+            self.logger.debug(f"Retrieved coordinates for {landmark_name}: {coords}")
+            return coords
+        except KeyError:
+            self.logger.error(f"Landmark '{landmark_name}' not found in PoseLandmark.")
+            return None
+        except Exception as e:
+            self.logger.exception(f"An error occurred while getting coordinates for '{landmark_name}': {e}")
+            return None
 
     def _calculate_angle(self, pointA, pointB, pointC):
-        # Calculate the angle at pointB using 2D coordinates
-        BA = pointA - pointB
-        BC = pointC - pointB
-        cosine_angle = np.dot(BA, BC) / (np.linalg.norm(BA) * np.linalg.norm(BC))
-        cosine_angle = np.clip(cosine_angle, -1.0, 1.0)  # Ensure within valid range
-        angle_rad = np.arccos(cosine_angle)
-        angle_deg = np.degrees(angle_rad)
-        return angle_deg
+        """
+        Calculates the angle at pointB formed by the line segments BA and BC.
 
-    def _save_frame_and_labels(self, frame, labels, video_name, frames_output_dir, labels_csv_path):
-        # Save the original frame image (without landmarks)
-        frame_filename = f'{video_name}_frame_{self.global_frame_count:06d}.jpg'
-        frame_path = os.path.join(frames_output_dir, frame_filename)
-        cv2.imwrite(frame_path, frame)
+        Args:
+            pointA (np.ndarray): Coordinates of point A.
+            pointB (np.ndarray): Coordinates of point B.
+            pointC (np.ndarray): Coordinates of point C.
 
-        # Append the label data to the CSV file
-        with open(labels_csv_path, 'a', newline='') as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow([
-                frame_filename,
-                labels['labels']
-            ])
+        Returns:
+            float or None: Angle in degrees or None if calculation fails.
+        """
+        try:
+            if pointA is None or pointB is None or pointC is None:
+                self.logger.warning("One or more points are None. Cannot calculate angle.")
+                return None
+            BA = pointA - pointB
+            BC = pointC - pointB
+            norm_BA = np.linalg.norm(BA)
+            norm_BC = np.linalg.norm(BC)
+            if norm_BA == 0 or norm_BC == 0:
+                self.logger.warning("Zero length vector encountered. Cannot calculate angle.")
+                return None
+            cosine_angle = np.dot(BA, BC) / (norm_BA * norm_BC)
+            cosine_angle = np.clip(cosine_angle, -1.0, 1.0)  # Ensure within valid range
+            angle_rad = np.arccos(cosine_angle)
+            angle_deg = np.degrees(angle_rad)
+            self.logger.debug(f"Calculated angle: {angle_deg} degrees.")
+            return angle_deg
+        except Exception as e:
+            self.logger.exception(f"Failed to calculate angle: {e}")
+            return None
 
-    def _display_angle(self, frame, joint_coords, angle_text):
-        # Display the angle text near the joint on the frame
-        x, y = int(joint_coords[0]), int(joint_coords[1])
-        cv2.putText(frame, angle_text, (x + 10, y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+    def _save_frame_and_labels(self, frame, pose_landmarks, label_name, video_name, frames_output_dir, labels_data,
+                               joint_angles=None):
+        """
+        Saves the frame image, landmarks, and appends label data.
+
+        Args:
+            frame (ndarray): The video frame.
+            pose_landmarks (LandmarkList): Detected pose landmarks.
+            label_name (str): Label associated with the frame.
+            video_name (str): Name of the video file.
+            frames_output_dir (str): Directory to save frames and landmarks.
+            labels_data (list): List to append label data dictionaries.
+            joint_angles (dict, optional): Dictionary of joint angles.
+        """
+        try:
+            # Save the original frame image (without landmarks)
+            frame_filename = f'{video_name}_frame_{self.global_frame_count:06d}.jpg'
+            frame_path = os.path.join(frames_output_dir, frame_filename)
+            cv2.imwrite(frame_path, frame)
+            self.logger.debug(f"Saved frame image: {frame_path}")
+
+            # Save the landmarks as a flattened list
+            landmarks_array = np.array([[lm.x, lm.y, lm.z] for lm in pose_landmarks.landmark]).flatten()
+            landmarks_filename = f'{video_name}_landmarks_{self.global_frame_count:06d}.npy'
+            landmarks_path = os.path.join(frames_output_dir, landmarks_filename)
+            np.save(landmarks_path, landmarks_array)
+            self.logger.debug(f"Saved landmarks array: {landmarks_path}")
+
+            # Prepare the label data dictionary
+            label_entry = {
+                'frame_filename': frame_filename,
+                'landmarks_filename': landmarks_filename,
+                'label': label_name
+            }
+
+            # If joint angles are provided, include them in the label entry
+            if joint_angles:
+                for joint, angle in joint_angles.items():
+                    label_entry[joint] = angle
+                self.logger.debug(f"Added joint angles to label entry: {joint_angles}")
+
+            # Append the label data to the labels_data list
+            labels_data.append(label_entry)
+            self.logger.debug(f"Appended label data for frame {self.global_frame_count}.")
+        except Exception as e:
+            self.logger.exception(f"Failed to save frame and labels for frame {self.global_frame_count}: {e}")
+
+    def _overlay_joint_angles(self, frame, pose_landmarks, angles_dict, match=True):
+        """
+        Overlays joint angles on the frame near the corresponding joints.
+
+        Args:
+            frame (ndarray): The video frame.
+            pose_landmarks (LandmarkList): Detected pose landmarks.
+            angles_dict (dict): Dictionary of joint angles.
+            match (bool): Whether the frame matches the label.
+        """
+        try:
+            for joint_name, angle in angles_dict.items():
+                # Determine the landmark to position the angle text
+                # This example places the text near the joint (left/right specific)
+                if "KNEE" in joint_name:
+                    landmark_name = 'RIGHT_KNEE' if 'RIGHT' in joint_name else 'LEFT_KNEE'
+                elif "ELBOW" in joint_name:
+                    landmark_name = 'RIGHT_ELBOW' if 'RIGHT' in joint_name else 'LEFT_ELBOW'
+                elif "SHOULDER" in joint_name:
+                    landmark_name = 'RIGHT_SHOULDER' if 'RIGHT' in joint_name else 'LEFT_SHOULDER'
+                elif "HIP" in joint_name:
+                    landmark_name = 'RIGHT_HIP' if 'RIGHT' in joint_name else 'LEFT_HIP'
+                else:
+                    # Default to a central landmark if joint is unknown
+                    landmark_name = 'NOSE'
+
+                # Get the landmark coordinates
+                try:
+                    landmark = pose_landmarks.landmark[PoseLandmark[landmark_name].value]
+                    x = int(landmark.x * frame.shape[1])
+                    y = int(landmark.y * frame.shape[0])
+
+                    # Define the text to overlay
+                    angle_text = f"{joint_name.split('_')[0]}: {int(angle)}°"
+
+                    # Define position offset
+                    offset_x = 20
+                    offset_y = -20
+
+                    # Put the text on the frame
+                    cv2.putText(
+                        frame, angle_text, (x + offset_x, y + offset_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (255, 0, 0) if match else (0, 255, 255), 1, cv2.LINE_AA
+                    )
+                    self.logger.debug(f"Overlayed angle '{angle_text}' at ({x + offset_x}, {y + offset_y}).")
+                except KeyError:
+                    self.logger.warning(f"Landmark '{landmark_name}' not found for overlaying angle '{joint_name}'.")
+                except Exception as e:
+                    self.logger.error(f"Failed to overlay angle '{joint_name}': {e}")
+        except Exception as e:
+            self.logger.error(f"Failed to overlay joint angles: {e}")
+
+
+def main():
+    """
+    Main function to load configuration and start processing.
+    """
+    try:
+        # Centralize configuration in a YAML file
+        CONFIG_FILEPATH = 'config/labeller_config.yaml'
+        if not os.path.exists(CONFIG_FILEPATH):
+            raise FileNotFoundError(f"Configuration file not found: {CONFIG_FILEPATH}")
+
+        with open(CONFIG_FILEPATH, 'r') as file:
+            config = yaml.safe_load(file)
+
+        processor = BlazePoseVideoProcessor(config)
+        processor.process_all_videos()
+
+    except Exception as e:
+        # Since logging is initialized inside the class, we need to set up a temporary logger here
+        logging.basicConfig(level=logging.ERROR)
+        logging.error(f"Failed to start BlazePoseVideoProcessor: {e}")
 
 
 if __name__ == '__main__':
-    # Initialize the BlazePoseVideoProcessor
-    processor = BlazePoseVideoProcessor(input_dir='labeller_input',
-                                        output_dir='classifier_input')
-    processor.process_all_videos()
+    main()
