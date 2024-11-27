@@ -1,10 +1,11 @@
+import tensorflow as tf
+
+
 class Classifier:
 
-    def __init__(self, classifier):
-        print("Classifier path:", classifier)
-        self.classifier = classifier
+    def __init__(self, classifier_path):
+        self.classifier = tf.keras.models.load_model(classifier_path)
 
     def predict(self, landmarks):
-        print("Classifier received landmarks:", landmarks)
-        print("Predicting on landmarks.")
-        return "jumping_jacks"
+        # pred = self.classifier.predict(landmarks)
+        return "jumping_jacks", 0.95
