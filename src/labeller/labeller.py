@@ -12,7 +12,7 @@ from src.utils.logger import setup_logger
 import logging
 
 
-class BlazePoseVideoProcessor:
+class BlazePoseVideoLabeller:
     def __init__(self, config):
         """
         Initializes the BlazePoseVideoProcessor.
@@ -624,7 +624,7 @@ def main():
         with open(CONFIG_FILEPATH, 'r') as file:
             config = yaml.safe_load(file)
 
-        processor = BlazePoseVideoProcessor(config)
+        processor = BlazePoseVideoLabeller(config)
         processor.process_all_videos()
 
     except Exception as e:
