@@ -7,14 +7,23 @@ from device import ConnectedDevice
 
 
 def run_app():
-    game = input("Please provide a game: ")
+    # Get game from user input
+    print("Game choices:", list(InputMapper.game_configs.keys()))
+    while True:
+        game = input("Please provide a game: ")
+        if game in InputMapper.game_configs:
+            break
+        else:
+            print("Invalid game.")
 
+    # Setup classes
     mapper = InputMapper(game)
     camera = Camera()
     labeller = Labeller()
     classifier = Classifier("classifier.keras")
     device = ConnectedDevice()
 
+    # Run pipeline
     while True:
         print("\nCapturing image...")
         image = camera.capture()
