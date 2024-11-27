@@ -7,4 +7,4 @@ class Classifier:
     def predict(self, landmarks):
         print("Classifier received landmarks:", landmarks)
         print("Predicting on landmarks.")
-        return "this is an exercise"
+        return "jumping_jacks"

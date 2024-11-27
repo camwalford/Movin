@@ -4,10 +4,10 @@ class InputMapper:
 
     game_configs = {
         "2048": {
-            "left": Key.left,
-            "right": Key.right,
-            "up": Key.up,
-            "down": Key.down,
+            "left_lunge": Key.left,
+            "right_lunge": Key.right,
+            "jumping_jacks": Key.up,
+            "squat": Key.down,
         }
     }
 
@@ -17,7 +17,5 @@ class InputMapper:
         self.config = InputMapper.game_configs[game]
 
     def exercise_to_key(self, exercise):
-        print("InputMapper received exercise:", exercise)
-        print("Mapping to key.")
-        return "this is a key"
+        return self.config[exercise]
 
