@@ -574,6 +574,7 @@ class BlazePoseVideoProcessor:
         """
         Saves the frame image and appends label data including the landmarks.
 
+
         Args:
             frame (ndarray): The video frame.
             pose_landmarks (LandmarkList): Detected pose landmarks.
@@ -595,9 +596,9 @@ class BlazePoseVideoProcessor:
 
             # Add the landmarks to the label_entry
             for idx, lm in enumerate(pose_landmarks.landmark):
-                label_entry[f'x{idx + 1}'] = lm.x
-                label_entry[f'y{idx + 1}'] = lm.y
-                label_entry[f'z{idx + 1}'] = lm.z  # Include z-coordinate in labels data
+                label_entry[f'x{idx}'] = lm.x
+                label_entry[f'y{idx}'] = lm.y
+                label_entry[f'z{idx}'] = lm.z  # Include z-coordinate in labels data
 
             # Add joint angles to the label_entry if available
             if joint_angles:
