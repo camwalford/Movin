@@ -8,7 +8,9 @@ import yaml
 from tqdm import tqdm
 from mediapipe.python.solutions.pose import PoseLandmark
 import pandas as pd
+from src.utils.logger import setup_logger
 import logging
+
 
 class BlazePoseVideoProcessor:
     def __init__(self, config):
@@ -18,9 +20,8 @@ class BlazePoseVideoProcessor:
         Args:
             config (dict): Configuration dictionary.
         """
-        self.log_dir = config.get('log_dir', 'logs')
-        self.log_level = config.get('log_level', 'INFO').upper()
-        self._setup_logging()
+        self.logger = setup_logger(name="BlazePoseVideoProcessor", log_dir=config.get('log_dir', 'logs'),
+                                   log_level=config.get('log_level', 'INFO'))
         self.logger.info("Initializing BlazePoseVideoProcessor...")
 
         self.input_dir = config['input_dir']
@@ -44,41 +45,6 @@ class BlazePoseVideoProcessor:
         self.global_frame_count = 0  # Counter for frames processed
         self.save_overlay_video = config.get('save_overlay_video', False)
         self.logger.info("BlazePoseVideoProcessor initialized successfully.")
-
-    def _setup_logging(self):
-        """
-        Sets up logging for the processor.
-        """
-        os.makedirs(self.log_dir, exist_ok=True)
-        log_filename = datetime.now().strftime('%Y%m%d_%H%M%S') + '.log'
-        log_filepath = os.path.join(self.log_dir, log_filename)
-
-        # Create a dedicated logger for this class
-        self.logger = logging.getLogger('BlazePoseVideoProcessor')
-        self.logger.setLevel(getattr(logging, self.log_level, logging.INFO))
-
-        # Prevent adding multiple handlers if already present
-        if not self.logger.handlers:
-            # File handler
-            file_handler = logging.FileHandler(log_filepath)
-            file_handler.setLevel(getattr(logging, self.log_level, logging.INFO))
-
-            # Stream handler (console)
-            stream_handler = logging.StreamHandler()
-            stream_handler.setLevel(getattr(logging, self.log_level, logging.INFO))
-
-            # Formatter
-            formatter = logging.Formatter(
-                '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
-            file_handler.setFormatter(formatter)
-            stream_handler.setFormatter(formatter)
-
-            # Add handlers to the logger
-            self.logger.addHandler(file_handler)
-            self.logger.addHandler(stream_handler)
-            self.logger.debug("Logging has been set up.")
 
     def process_all_videos(self):
         """
@@ -659,6 +625,7 @@ def main():
 
         processor = BlazePoseVideoProcessor(config)
         processor.process_all_videos()
+
     except Exception as e:
         # Since logging is initialized inside the class, we need to set up a temporary logger here
         logging.basicConfig(level=logging.ERROR)
