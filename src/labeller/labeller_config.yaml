@@ -1,5 +1,5 @@
 # Set to the name of the single label you want to generate data for
-target_label: "left_lunge"
+target_label: "squat"
 multi_label: True # Set to True if you want to generate data for all movement_labels
 use_joint_angles: True # Set to True if you want to use joint angles to filter frames
 input_dir: "./labeller_input"
@@ -61,9 +61,9 @@ movement_labels:
       - name: "KNEE"
         side: "BOTH"
         min_angle: 0
-        max_angle: 120
-      - name: "HIP"
-        side: "BOTH"
-        min_angle: 30
-        max_angle: 70
+        max_angle: 150
+#      - name: "HIP"
+#        side: "BOTH"
+#        min_angle: 30
+#        max_angle: 180
 
