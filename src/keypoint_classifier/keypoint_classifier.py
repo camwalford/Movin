@@ -173,6 +173,7 @@ def main():
     num_classes = len(label_encoder.classes_)
     input_shape = X_train.shape[1]
     model = build_model(input_shape, num_classes)
+    model.summary()
 
     # Train the model
     logger.info("Starting model training...")
