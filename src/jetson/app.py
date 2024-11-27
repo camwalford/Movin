@@ -1,8 +1,8 @@
 import time
-from mapper import InputMapper
-from camera import Camera
+from jetsoncamera import JetsonCamera, LaptopCamera
 from labeller import Labeller
 from classifier import Classifier
+from mapper import InputMapper
 from device import ConnectedDevice
 
 
@@ -17,10 +17,10 @@ def run_app():
             print("Invalid game.")
 
     # Setup classes
-    mapper = InputMapper(game)
-    camera = Camera()
+    camera = LaptopCamera()
     labeller = Labeller()
     classifier = Classifier("classifier.keras")
+    mapper = InputMapper(game)
     device = ConnectedDevice()
 
     # Run pipeline

@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-
 class Classifier:
 
     def __init__(self, classifier_path):
