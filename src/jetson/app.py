@@ -4,6 +4,7 @@ from labeller import Labeller
 from classifier import Classifier
 from mapper import InputMapper
 from device import ConnectedDevice
+from src.jetson.detector import MovementDetector
 
 
 def run_app():
@@ -19,20 +20,25 @@ def run_app():
     # Setup classes
     camera = LaptopCamera()
     labeller = Labeller()
+    detector = MovementDetector(queue_size=30, threshold=10)
     classifier = Classifier("classifier.keras")
     mapper = InputMapper(game)
     device = ConnectedDevice()
 
     # Run pipeline
     while True:
-        print("\nCapturing image...")
+        # print("\nCapturing image...")
         image = camera.capture()
-        landmarks = labeller.extract_landmarks(image)
-        exercise, probability = classifier.predict(landmarks)
-        print("Exercise identified:", exercise, ", Probability:", probability)
-        key = mapper.exercise_to_key(exercise)
-        device.execute(key)
-        time.sleep(3)
+        flattened_landmarks, non_flattened_landmarks = labeller.extract_landmarks(image)
+        if flattened_landmarks is None or not flattened_landmarks.any():
+            # print("No landmarks detected. Skipping...")
+            continue
+        if detector.movement_detected(non_flattened_landmarks):
+            exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
+            print("Exercise identified:", exercise, ", Probability:", probability)
+            key = mapper.exercise_to_key(exercise)
+            device.execute(key)
+            time.sleep(1)
 
 
 if __name__ == "__main__":
