@@ -8,7 +8,7 @@ import yaml
 from tqdm import tqdm
 from mediapipe.python.solutions.pose import PoseLandmark
 import pandas as pd
-from src.utils.logger import setup_logger
+from src.cam.utils.logger import setup_logger
 import logging
 
 

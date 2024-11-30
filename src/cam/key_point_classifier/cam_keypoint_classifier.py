@@ -1,10 +1,7 @@
 import numpy as np
 import pandas as pd
-import tqdm
 from glob import glob
-import keras
-from keras import layers, Sequential, Input
-from keras import ops
+from keras import Sequential, Input
 from keras.src.callbacks import EarlyStopping
 from keras.src.layers import Dense, Dropout
 from keras.src.optimizers import Adam
@@ -13,10 +10,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 
-from src.utils.logger import setup_logger
+from src.cam.utils.logger import setup_logger
 import os
 
-logger = setup_logger(__name__, "./logs/keypoint_classifier", "INFO")
+logger = setup_logger(__name__, "logs/keypoint_classifier", "INFO")
 REQUIRED_COLUMNS = ["movement_label"] + [f"{coord}{i}" for i in range(33) for coord in ("x", "y", "z")] # 33 keypoints
 
 
