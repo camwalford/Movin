@@ -27,7 +27,6 @@ def run_app():
     device = ConnectedDevice()
 
     exercise = "idle"
-    color = (255, 0, 0)
     next_input = True # Flag to check if the next input is valid
     display = True # Set to True to display the camera feed
     # Run pipeline
@@ -40,18 +39,17 @@ def run_app():
             continue
         if detector.movement_detected(non_flattened_landmarks):
             exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
-            print("Exercise identified:", exercise, ", Probability:", probability)
+            print("Exercise identified:", exercise,
+                  "\nProbability:", probability)
             if exercise != "idle" and next_input:
-                color = (0, 255, 0)
                 key = mapper.exercise_to_key(exercise)
                 device.execute(key)
                 next_input = False
             if exercise == "idle":
-                color = (255, 0, 0)
                 next_input = True
 
         if display:
-            camera.display(image, exercise, color)
+            camera.display(image, exercise)
 
 if __name__ == "__main__":
     run_app()
