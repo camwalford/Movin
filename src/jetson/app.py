@@ -6,7 +6,7 @@ from mapper import InputMapper
 from device import ConnectedDevice
 from src.jetson.detector import MovementDetector
 
-cam_classifier = Classifier("../cam/models/movement_classifier_model1.keras", "../cam/models/label_encoder_classes1.npy")
+cam_classifier = Classifier("../cam/models/movement_classifier_model_large.keras", "../cam/models/label_encoder_classes_large.npy")
 kate_classifier = Classifier("./classifier.keras")
 def run_app():
     # Get game from user input
@@ -21,11 +21,14 @@ def run_app():
     # Setup classes
     camera = LaptopCamera()
     labeller = Labeller()
-    detector = MovementDetector(queue_size=30, threshold=8)
+    detector = MovementDetector(queue_size=30, threshold=4, z_weight=1)
     classifier = cam_classifier
     mapper = InputMapper(game)
     device = ConnectedDevice()
 
+    exercise = "idle"
+    next_input = True # Flag to check if the next input is valid
+    display = True # Set to True to display the camera feed
     # Run pipeline
     while True:
         # print("\nCapturing image...")
@@ -36,11 +39,17 @@ def run_app():
             continue
         if detector.movement_detected(non_flattened_landmarks):
             exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
-            print("Exercise identified:", exercise, ", Probability:", probability)
-            key = mapper.exercise_to_key(exercise)
-            device.execute(key)
-            time.sleep(1)
+            print("Exercise identified:", exercise,
+                  "\nProbability:", probability)
+            if exercise != "idle" and next_input:
+                key = mapper.exercise_to_key(exercise)
+                device.execute(key)
+                next_input = False
+            if exercise == "idle":
+                next_input = True
 
+        if display:
+            camera.display(image, exercise)
 
 if __name__ == "__main__":
     run_app()

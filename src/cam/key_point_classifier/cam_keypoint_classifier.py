@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from glob import glob
+import keras
 from keras import Sequential, Input
 from keras.src.callbacks import EarlyStopping
 from keras.src.layers import Dense, Dropout
@@ -50,9 +51,12 @@ def load_most_recent_data(base_path, movements):
         movement_path = os.path.join(base_path, movement)
         most_recent_dir = max(glob(movement_path + "/*"), key=os.path.getctime)
         logger.info(f"Loading data from {most_recent_dir}")
+        try:
+            df = load_data(most_recent_dir)
+            dfs.append(df)
+        except FileNotFoundError:
+            logger.warning(f"No data found for {movement} in {most_recent_dir}")
 
-        df = load_data(most_recent_dir)
-        dfs.append(df)
 
     # Concatenate all movement DataFrames
     concatenated_df = pd.concat(dfs, ignore_index=True)
@@ -141,10 +145,11 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
     Returns:
         history: Training history object.
     """
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='loss', patience=2, restore_best_weights=True)
 
     history = model.fit(
         X_train, y_train,
+        validation_split=0.20,
         validation_data=(X_val, y_val),
         epochs=epochs,
         batch_size=batch_size,
@@ -155,10 +160,10 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
 
 
 def main():
-    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge"]
+    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle"]
 
     # Load and preprocess the most recent training data
-    train_data = load_most_recent_data("../labeller/labeller_output/train", movements)
+    train_data = load_most_recent_data("../../blaze_labelling/labeller_output/train", movements)
     X, y, label_encoder = preprocess_data(train_data)
 
     # Split into training and validation sets
@@ -174,7 +179,7 @@ def main():
 
     # Train the model
     logger.info("Starting model training...")
-    history = train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
+    history = train_model(model, X_train, y_train, X_val, y_val, epochs=50)
 
     # Evaluate the model on the validation set
     val_loss, val_accuracy = model.evaluate(X_val, y_val, verbose=0)
@@ -195,7 +200,7 @@ def main():
     logger.info("Model and label encoder saved successfully.")
 
     # Unseen test data for final evaluation
-    test_data = load_most_recent_data("../labeller/labeller_output/test", movements)
+    test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
     X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
     logger.debug(f"Test feature matrix shape: {X_test.shape}")
     logger.debug(f"Test label array shape: {y_test.shape}")
