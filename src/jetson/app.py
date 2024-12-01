@@ -29,6 +29,7 @@ def run_app():
     exercise = "idle"
     color = (255, 0, 0)
     next_input = True # Flag to check if the next input is valid
+    display = True # Set to True to display the camera feed
     # Run pipeline
     while True:
         # print("\nCapturing image...")
@@ -43,14 +44,9 @@ def run_app():
             if exercise == "idle":
                 color=(255, 0, 0)
                 next_input = True
-                camera.display(image, exercise, color)
-                continue
-            if next_input:
-                color = (0, 255, 0)
-                key = mapper.exercise_to_key(exercise)
-                device.execute(key)
-                next_input = False
-        camera.display(image, exercise, color)
+
+        if display:
+            camera.display(image, exercise, color)
 
 if __name__ == "__main__":
     run_app()
