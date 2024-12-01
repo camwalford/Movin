@@ -1,3 +1,4 @@
+import cv2
 import mediapipe as mp
 import numpy as np
 
@@ -6,21 +7,22 @@ class Labeller:
 
     def __init__(self):
         print("Setting up Blaze.")
-        self.pose = mp.solutions.pose.Pose(static_image_mode=False,
+        self._pose = mp.solutions.pose.Pose(static_image_mode=False,
                                            model_complexity=1,
                                            smooth_landmarks=True,
                                            enable_segmentation=False,
                                            min_detection_confidence=0.5,
                                            min_tracking_confidence=0.5)
 
+
     def extract_landmarks(self, image):
         # print("Extracting landmarks.")
-
-        results = self.pose.process(image)
+        results = self._pose.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         if not results.pose_landmarks:
             return None, None
 
-        landmarks = results.pose_landmarks.landmark
+        landmarks = results.pose_world_landmarks.landmark
+
         pose = []
         for landmark in landmarks:
             pose.append([landmark.x, landmark.y, landmark.z])
