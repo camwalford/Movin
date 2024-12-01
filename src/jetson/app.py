@@ -6,7 +6,7 @@ from mapper import InputMapper
 from device import ConnectedDevice
 from src.jetson.detector import MovementDetector
 
-cam_classifier = Classifier("../cam/models/movement_classifier_model1.keras", "../cam/models/label_encoder_classes1.npy")
+cam_classifier = Classifier("../cam/models/movement_classifier_model_large.keras", "../cam/models/label_encoder_classes_large.npy")
 kate_classifier = Classifier("./classifier.keras")
 def run_app():
     # Get game from user input
@@ -21,7 +21,7 @@ def run_app():
     # Setup classes
     camera = LaptopCamera()
     labeller = Labeller()
-    detector = MovementDetector(queue_size=30, threshold=5, z_weight=1)
+    detector = MovementDetector(queue_size=30, threshold=4, z_weight=1)
     classifier = cam_classifier
     mapper = InputMapper(game)
     device = ConnectedDevice()
