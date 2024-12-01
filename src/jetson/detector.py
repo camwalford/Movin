@@ -34,8 +34,8 @@ class MovementDetector:
 
     def _is_movement_present(self):
         # print(f"Checking difference in landmarks after {self._queue_size} frames.")
-        first_frame_landmarks = self._landmarks_queue[0]
-        last_frame_landmarks = self._landmarks_queue[-1]
+        first_frame_landmarks = list(self._landmarks_queue)[:5]
+        last_frame_landmarks = list(self._landmarks_queue)[-5:]
         total_movement = self._calculate_distance(first_frame_landmarks, last_frame_landmarks)
         print(f"Total movement: {total_movement}")
         if total_movement > self._threshold:
@@ -45,12 +45,11 @@ class MovementDetector:
         return False
 
     def _calculate_distance(self, first_landmarks, last_landmarks):
-        diffs = first_landmarks - last_landmarks
-        # Apply weighting to z-differences
+        avg_first = np.mean(first_landmarks, axis=0)
+        avg_last = np.mean(last_landmarks, axis=0)
+        diffs = avg_first - avg_last
         diffs[:, 2] *= self._z_weight
-        # Compute distances with weighted z
         distances = np.linalg.norm(diffs, axis=1)
-        # Apply landmark weights
         weighted_distances = distances * self._landmark_weights
         total_distance = np.sum(weighted_distances)
         return total_distance
