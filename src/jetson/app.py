@@ -41,8 +41,13 @@ def run_app():
         if detector.movement_detected(non_flattened_landmarks):
             exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
             print("Exercise identified:", exercise, ", Probability:", probability)
+            if exercise != "idle" and next_input:
+                color = (0, 255, 0)
+                key = mapper.exercise_to_key(exercise)
+                device.execute(key)
+                next_input = False
             if exercise == "idle":
-                color=(255, 0, 0)
+                color = (255, 0, 0)
                 next_input = True
 
         if display:
