@@ -250,6 +250,7 @@ class BlazePoseVideoLabeller:
                     self._save_frame_and_labels(
                         frame=frame,
                         pose_landmarks=results.pose_landmarks,
+                        pose_world_landmarks=results.pose_world_landmarks,
                         label_name=label_name,
                         video_name=video_name,
                         frames_output_dir=frames_output_dir,
@@ -570,7 +571,7 @@ class BlazePoseVideoLabeller:
             self.logger.exception(f"Failed to calculate angle: {e}")
             return None
 
-    def _save_frame_and_labels(self, frame, pose_landmarks, label_name, video_name, frames_output_dir, labels_data, joint_angles=None):
+    def _save_frame_and_labels(self, frame, pose_landmarks, pose_world_landmarks, label_name, video_name, frames_output_dir, labels_data, joint_angles=None):
         """
         Saves the frame image and appends label data including the landmarks.
 
@@ -595,7 +596,7 @@ class BlazePoseVideoLabeller:
             label_entry = {'frame_filename': frame_filename, 'movement_label': label_name}
 
             # Add the landmarks to the label_entry
-            for idx, lm in enumerate(pose_landmarks.landmark):
+            for idx, lm in enumerate(pose_world_landmarks.landmark):
                 label_entry[f'x{idx}'] = lm.x
                 label_entry[f'y{idx}'] = lm.y
                 label_entry[f'z{idx}'] = lm.z  # Include z-coordinate in labels data
