@@ -37,3 +37,9 @@ class LaptopCamera:
             return frame  # Return as NumPy array
         else:
             raise Exception("Could not capture image.")
+
+
+    def display(self, image, text="idle", color=(255, 0, 0), window_name="Camera"):
+        cv2.putText(image, f"Exercise: {text}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        cv2.imshow(window_name, image)
+        cv2.waitKey(1)
