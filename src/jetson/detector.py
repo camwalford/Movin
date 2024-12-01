@@ -33,7 +33,7 @@ class MovementDetector:
         return False
 
     def _is_movement_present(self):
-        print(f"Checking difference in landmarks after {self._queue_size} frames.")
+        # print(f"Checking difference in landmarks after {self._queue_size} frames.")
         first_frame_landmarks = self._landmarks_queue[0]
         last_frame_landmarks = self._landmarks_queue[-1]
         total_movement = self._calculate_distance(first_frame_landmarks, last_frame_landmarks)
