@@ -21,11 +21,14 @@ def run_app():
     # Setup classes
     camera = LaptopCamera()
     labeller = Labeller()
-    detector = MovementDetector(queue_size=30, threshold=8)
+    detector = MovementDetector(queue_size=30, threshold=5, z_weight=1)
     classifier = cam_classifier
     mapper = InputMapper(game)
     device = ConnectedDevice()
 
+    exercise = "idle"
+    color = (255, 0, 0)
+    next_input = True # Flag to check if the next input is valid
     # Run pipeline
     while True:
         # print("\nCapturing image...")
@@ -37,10 +40,17 @@ def run_app():
         if detector.movement_detected(non_flattened_landmarks):
             exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
             print("Exercise identified:", exercise, ", Probability:", probability)
-            key = mapper.exercise_to_key(exercise)
-            device.execute(key)
-            time.sleep(1)
-
+            if exercise == "idle":
+                color=(255, 0, 0)
+                next_input = True
+                camera.display(image, exercise, color)
+                continue
+            if next_input:
+                color = (0, 255, 0)
+                key = mapper.exercise_to_key(exercise)
+                device.execute(key)
+                next_input = False
+        camera.display(image, exercise, color)
 
 if __name__ == "__main__":
     run_app()
