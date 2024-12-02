@@ -1,6 +1,5 @@
-numpy~=1.26.4
-opencv-python~=4.10.0.84
-mediapipe~=0.10.18
-matplotlib~=3.9.3
-pynput~=1.7.7
-tensorflow~=2.18.0
+numpy
+opencv-python
+mediapipe
+pynput
+tensorflow~=2.3
