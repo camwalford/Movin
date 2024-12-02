@@ -1,1 +1,0 @@
-This is where the labeller saves a version of the input video with an overlaid skeleton.
