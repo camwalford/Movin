@@ -6,8 +6,8 @@ from mapper import InputMapper
 from device import ConnectedDevice
 from src.jetson.detector import MovementDetector
 
-cam_classifier = Classifier("src/jetson/models/cam_model.keras", "src/jetson/models/cam_label_encoder.npy")
-kate_classifier = Classifier("src/jetson/models/classifier.keras")
+# cam_classifier = Classifier("src/jetson/models/cam_model.keras", "src/jetson/models/cam_label_encoder.npy")
+# kate_classifier = Classifier("src/jetson/models/classifier.keras")
 def run_app():
     # Get game from user input
     print("Game choices:", list(InputMapper.game_configs.keys()))
@@ -22,7 +22,7 @@ def run_app():
     camera = LaptopCamera()
     labeller = Labeller()
     detector = MovementDetector(queue_size=30, threshold=4, z_weight=1)
-    classifier = cam_classifier
+    classifier = None
     mapper = InputMapper(game)
     device = ConnectedDevice()
 
@@ -38,7 +38,8 @@ def run_app():
             # print("No landmarks detected. Skipping...")
             continue
         if detector.movement_detected(non_flattened_landmarks):
-            exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
+            # exercise, probability = classifier.predict(flattened_landmarks.reshape(1, -1))
+            exercise, probability = "idle", 0.1
             print("Exercise identified:", exercise,
                   "\nProbability:", probability)
             if exercise != "idle" and next_input:
