@@ -17,9 +17,10 @@ def run_app():
     #         break
     #     else:
     #         print("Invalid game.")
+    game = "2048"
 
     # Setup classes
-    camera = LaptopCamera()
+    camera = JetsonCamera()
     labeller = Labeller()
     detector = MovementDetector(queue_size=30, threshold=4, z_weight=1)
     classifier = cam_classifier
