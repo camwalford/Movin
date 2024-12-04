@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 
-from src.cam.utils.logger import setup_logger
+from src.cam.utils.custom_logger import setup_logger
 import os
 
 logger = setup_logger(__name__, "logs/keypoint_classifier", "INFO")
