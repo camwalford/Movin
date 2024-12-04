@@ -22,7 +22,7 @@ class BluetoothDaemon:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
-            print(f"Bluetooth daemon started with PID: {self.process.pid}")
+            print("Bluetooth daemon started with PID: {0}".format(self.process.pid))
             # Give the daemon some time to initialize
             time.sleep(2)
         except FileNotFoundError:
@@ -59,13 +59,13 @@ class BluetoothServer:
             thread.start()
             print("Bluetooth server initialized and running in the background.")
         except Exception as e:
-            print(f"Failed to start Bluetooth server: {e}")
+            print("Failed to start Bluetooth server: {0}".format(e))
 
     def run_mainloop(self):
         try:
             self.mainloop.run()
         except Exception as e:
-            print(f"GLib MainLoop error: {e}")
+            print("GLib MainLoop error: {0}".format(e))
 
     def stop(self):
         if self.mainloop:
@@ -88,7 +88,7 @@ class BTHandler:
             print("Starting Bluetooth Server...")
             self.server.start()
         except Exception as e:
-            print(f"Error starting BTHandler: {e}")
+            print("Error starting BTHandler: {0}".format(e))
             self.stop()
 
     def stop(self):
@@ -96,12 +96,12 @@ class BTHandler:
         try:
             self.server.stop()
         except Exception as e:
-            print(f"Error stopping Bluetooth server: {e}")
+            print("Error stopping Bluetooth server: {0}".format(e))
 
         try:
             self.daemon.stop()
         except Exception as e:
-            print(f"Error stopping Bluetooth daemon: {e}")
+            print("Error stopping Bluetooth daemon: {0}".format(e))
 
 
 if __name__ == "__main__":

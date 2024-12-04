@@ -79,7 +79,7 @@ class Keyboard:
                     print("released")
                     sleep(0.05)  # Small delay before next key
             else:  # Handle regular characters
-                key_name = f"KEY_{token.upper()}" if token.isalpha() else f"KEY_{token}"
+                key_name = "KEY_{0}".format(token.upper()) if token.isalpha() else "KEY_{0}".format(token)
                 if key_name in keymap.keytable:
                     norm_key = keymap.convert(key_name)
                     print("pressing")
@@ -104,7 +104,7 @@ class Keyboard:
         for char in text:
             if char == "%":
                 if special:  # End of a special token
-                    tokens.append(f"KEY_{temp.upper()}")
+                    tokens.append("KEY_{0}".format(temp.upper()))
                     temp = ""
                 special = not special
             elif special:
