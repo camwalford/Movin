@@ -3,12 +3,15 @@ import cv2
 
 class JetsonCamera:
 
-    def __init__(self):
+    def __init__(self, width=640, height=480):
         # Open the default camera
         self.camera = cv2.VideoCapture(0)
 
-        # Handle unopened camera
-        if not self.camera.isOpened():
+        # Set resolution
+        if self.camera.isOpened():
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        else:
             self.camera = None
             print("Could not open camera.")
 
