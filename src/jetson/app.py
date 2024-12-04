@@ -29,7 +29,7 @@ def run_app():
 
     exercise = "idle"
     next_input = True # Flag to check if the next input is valid
-    display = True # Set to True to display the camera feed
+    display = False # Set to True to display the camera feed
     # Run pipeline
     while True:
         # print("\nCapturing image...")
