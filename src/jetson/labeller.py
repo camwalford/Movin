@@ -8,7 +8,7 @@ class Labeller:
     def __init__(self):
         print("Setting up Blaze.")
         self._pose = mp.solutions.pose.Pose(static_image_mode=False,
-                                           model_complexity=1,
+                                           model_complexity=0,
                                            smooth_landmarks=True,
                                            enable_segmentation=False,
                                            min_detection_confidence=0.5,
