@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
+
 class Classifier:
 
     def __init__(self, classifier_path, label_encoder_path=None):
@@ -14,4 +15,3 @@ class Classifier:
             pred_class = self.class_names[np.argmax(pred)]
             probability = np.max(pred)
             return pred_class, probability
-        return "jumping_jacks", 0.95

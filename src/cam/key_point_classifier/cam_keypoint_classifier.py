@@ -20,13 +20,12 @@ REQUIRED_COLUMNS = ["movement_label"] + [f"{coord}{i}" for i in range(33) for co
 
 def load_data(file_path, data_format="parquet"):
     file = os.path.join(file_path, "labels." + data_format)
-    match data_format:
-        case "parquet":
-            df = pd.read_parquet(file)
-        case "csv":
-            df = pd.read_csv(file)
-        case _:
-            raise ValueError(f"Invalid data format: {data_format}")
+    if data_format == "parquet":
+        df = pd.read_parquet(file)
+    elif data_format == "csv":
+        df = pd.read_csv(file)
+    else:
+        raise ValueError(f"Invalid data format: {data_format}")
 
     missing_columns = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing_columns:
@@ -188,8 +187,8 @@ def main():
     # Save the model and label encoder to timestamped directories
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
     output_filepath = f"./keypoint_classifier_output/{timestamp}"
-    model_filepath = os.path.join(output_filepath, "movement_classifier_model.keras")
-    label_encoder_filepath = os.path.join(output_filepath, "label_encoder_classes.npy")
+    model_filepath = os.path.join(output_filepath, "model.h5")
+    label_encoder_filepath = os.path.join(output_filepath, "label_encoder.npy")
 
     os.makedirs(output_filepath, exist_ok=True)
     os.makedirs(os.path.dirname(model_filepath), exist_ok=True)
@@ -199,22 +198,22 @@ def main():
     np.save(label_encoder_filepath, label_encoder.classes_)
     logger.info("Model and label encoder saved successfully.")
 
-    # Unseen test data for final evaluation
-    test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
-    X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
-    logger.debug(f"Test feature matrix shape: {X_test.shape}")
-    logger.debug(f"Test label array shape: {y_test.shape}")
-
-    # Evaluate the model on the test data to avoid overfitting
-    test_val_loss, test_val_accuracy = model.evaluate(X_test, y_test, verbose=1)
-    logger.info(f"Test Set Loss: {test_val_loss:.4f}, Test Set Accuracy: {test_val_accuracy:.4f}")
-
-    # Save the test set evaluation results to the output directory
-    test_results_filepath = os.path.join(output_filepath, "test_results.txt")
-    with open(test_results_filepath, "w") as f:
-        f.write(f"Test Set Loss: {test_val_loss:.4f}\n")
-        f.write(f"Test Set Accuracy: {test_val_accuracy:.4f}\n")
-    logger.info(f"Test set evaluation results saved to {test_results_filepath}")
+    # # Unseen test data for final evaluation
+    # test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
+    # X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
+    # logger.debug(f"Test feature matrix shape: {X_test.shape}")
+    # logger.debug(f"Test label array shape: {y_test.shape}")
+    #
+    # # Evaluate the model on the test data to avoid overfitting
+    # test_val_loss, test_val_accuracy = model.evaluate(X_test, y_test, verbose=1)
+    # logger.info(f"Test Set Loss: {test_val_loss:.4f}, Test Set Accuracy: {test_val_accuracy:.4f}")
+    #
+    # # Save the test set evaluation results to the output directory
+    # test_results_filepath = os.path.join(output_filepath, "test_results.txt")
+    # with open(test_results_filepath, "w") as f:
+    #     f.write(f"Test Set Loss: {test_val_loss:.4f}\n")
+    #     f.write(f"Test Set Accuracy: {test_val_accuracy:.4f}\n")
+    # logger.info(f"Test set evaluation results saved to {test_results_filepath}")
 
 if __name__ == '__main__':
     main()
