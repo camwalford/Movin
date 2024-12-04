@@ -4,9 +4,9 @@ from labeller import Labeller
 from classifier import Classifier
 from mapper import InputMapper
 from device import ConnectedDevice
-from src.jetson.detector import MovementDetector
+from detector import MovementDetector
 
-cam_classifier = Classifier("src/jetson/models/model_py38.keras", "src/jetson/models/label_encoder_py38.npy")
+cam_classifier = Classifier("models/model.h5", "models/label_encoder_h5.npy")
 # kate_classifier = Classifier("src/jetson/models/classifier.keras")
 def run_app():
     # Get game from user input
