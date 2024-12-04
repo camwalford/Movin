@@ -77,3 +77,8 @@ class LaptopCamera:
         cv2.imshow(window_name, image)
         cv2.waitKey(1)
 
+
+if __name__ == "__main__":
+    camera = JetsonCamera()
+    camera.capture("image.jpg")
+

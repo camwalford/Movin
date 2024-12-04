@@ -51,6 +51,9 @@ def run_app():
         flattened_landmarks, non_flattened_landmarks = labeller.extract_landmarks(image)
         if flattened_landmarks is None or not flattened_landmarks.any():
             # print("No landmarks detected. Skipping...")
+            # DISPLAY CAMERA
+            if config["showDisplay"]:
+                camera.display(image, "No player detected.")
             continue
 
         # CLASSIFY EXERCISE
