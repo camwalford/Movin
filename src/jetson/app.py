@@ -1,4 +1,4 @@
-from jetsoncamera import JetsonCamera, LaptopCamera
+from jetsoncamera import JetsonCamera
 from labeller import Labeller
 from classifier import Classifier
 from mapper import InputMapper
@@ -15,6 +15,7 @@ classifiers = {
 config = {
     "game": "2048",  # Leave blank to get user's input
     "classifier": classifiers["cam"],
+    "detector": {"queue_size": 30, "threshold": 2, "z_weight": 1},
     "showDisplay": True
 }
 
@@ -34,7 +35,7 @@ def run_app():
     # Setup classes
     camera = JetsonCamera()
     labeller = Labeller()
-    detector = MovementDetector(queue_size=30, threshold=4, z_weight=1)
+    detector = MovementDetector(**config["detector"])
     classifier = Classifier(*config["classifier"])
     mapper = InputMapper(game)
     keyboard = Keyboard()
@@ -50,7 +51,6 @@ def run_app():
         # EXTRACT LANDMARKS
         flattened_landmarks, non_flattened_landmarks = labeller.extract_landmarks(image)
         if flattened_landmarks is None or not flattened_landmarks.any():
-            # print("No landmarks detected. Skipping...")
             # DISPLAY CAMERA
             if config["showDisplay"]:
                 camera.display(image, "No player detected.")

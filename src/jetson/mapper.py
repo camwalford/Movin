@@ -6,7 +6,19 @@ class InputMapper:
             "right_lunge": "%right%",
             "jumping_jacks": "%up%",
             "squat": "%down%",
-        }
+        },
+        "Tetris": {
+            "left_lunge": "%left%",
+            "right_lunge": "%right%",
+            "jumping_jacks": "%up%",
+            "squat": "%space%",
+        },
+        "Connect 4": {
+            "left_lunge": "%left%",
+            "right_lunge": "%right%",
+            "jumping_jacks": "%down%",
+            "squat": "%down%",
+        },
     }
 
     def __init__(self, game):
