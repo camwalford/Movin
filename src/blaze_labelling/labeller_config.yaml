@@ -62,8 +62,15 @@ movement_labels:
         side: "BOTH"
         min_angle: 0
         max_angle: 150
-#      - name: "HIP"
-#        side: "BOTH"
-#        min_angle: 30
-#        max_angle: 180
+
+  idle:
+    joints:
+      - name: "SHOULDER"
+        side: "BOTH"
+        min_angle: 0
+        max_angle: 140
+      - name: "KNEE"
+        side: "BOTH"
+        min_angle: 100
+        max_angle: 240
 

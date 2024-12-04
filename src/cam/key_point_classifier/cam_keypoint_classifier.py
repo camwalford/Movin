@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from glob import glob
+import keras
 from keras import Sequential, Input
 from keras.src.callbacks import EarlyStopping
 from keras.src.layers import Dense, Dropout
@@ -19,13 +20,12 @@ REQUIRED_COLUMNS = ["movement_label"] + [f"{coord}{i}" for i in range(33) for co
 
 def load_data(file_path, data_format="parquet"):
     file = os.path.join(file_path, "labels." + data_format)
-    match data_format:
-        case "parquet":
-            df = pd.read_parquet(file)
-        case "csv":
-            df = pd.read_csv(file)
-        case _:
-            raise ValueError(f"Invalid data format: {data_format}")
+    if data_format == "parquet":
+        df = pd.read_parquet(file)
+    elif data_format == "csv":
+        df = pd.read_csv(file)
+    else:
+        raise ValueError(f"Invalid data format: {data_format}")
 
     missing_columns = set(REQUIRED_COLUMNS) - set(df.columns)
     if missing_columns:
@@ -50,9 +50,12 @@ def load_most_recent_data(base_path, movements):
         movement_path = os.path.join(base_path, movement)
         most_recent_dir = max(glob(movement_path + "/*"), key=os.path.getctime)
         logger.info(f"Loading data from {most_recent_dir}")
+        try:
+            df = load_data(most_recent_dir)
+            dfs.append(df)
+        except FileNotFoundError:
+            logger.warning(f"No data found for {movement} in {most_recent_dir}")
 
-        df = load_data(most_recent_dir)
-        dfs.append(df)
 
     # Concatenate all movement DataFrames
     concatenated_df = pd.concat(dfs, ignore_index=True)
@@ -141,10 +144,11 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
     Returns:
         history: Training history object.
     """
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='loss', patience=2, restore_best_weights=True)
 
     history = model.fit(
         X_train, y_train,
+        validation_split=0.20,
         validation_data=(X_val, y_val),
         epochs=epochs,
         batch_size=batch_size,
@@ -155,10 +159,10 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
 
 
 def main():
-    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge"]
+    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle"]
 
     # Load and preprocess the most recent training data
-    train_data = load_most_recent_data("../labeller/labeller_output/train", movements)
+    train_data = load_most_recent_data("../../blaze_labelling/labeller_output/train", movements)
     X, y, label_encoder = preprocess_data(train_data)
 
     # Split into training and validation sets
@@ -174,7 +178,7 @@ def main():
 
     # Train the model
     logger.info("Starting model training...")
-    history = train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
+    history = train_model(model, X_train, y_train, X_val, y_val, epochs=50)
 
     # Evaluate the model on the validation set
     val_loss, val_accuracy = model.evaluate(X_val, y_val, verbose=0)
@@ -183,8 +187,8 @@ def main():
     # Save the model and label encoder to timestamped directories
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
     output_filepath = f"./keypoint_classifier_output/{timestamp}"
-    model_filepath = os.path.join(output_filepath, "movement_classifier_model.keras")
-    label_encoder_filepath = os.path.join(output_filepath, "label_encoder_classes.npy")
+    model_filepath = os.path.join(output_filepath, "model.h5")
+    label_encoder_filepath = os.path.join(output_filepath, "label_encoder.npy")
 
     os.makedirs(output_filepath, exist_ok=True)
     os.makedirs(os.path.dirname(model_filepath), exist_ok=True)
@@ -194,22 +198,22 @@ def main():
     np.save(label_encoder_filepath, label_encoder.classes_)
     logger.info("Model and label encoder saved successfully.")
 
-    # Unseen test data for final evaluation
-    test_data = load_most_recent_data("../labeller/labeller_output/test", movements)
-    X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
-    logger.debug(f"Test feature matrix shape: {X_test.shape}")
-    logger.debug(f"Test label array shape: {y_test.shape}")
-
-    # Evaluate the model on the test data to avoid overfitting
-    test_val_loss, test_val_accuracy = model.evaluate(X_test, y_test, verbose=1)
-    logger.info(f"Test Set Loss: {test_val_loss:.4f}, Test Set Accuracy: {test_val_accuracy:.4f}")
-
-    # Save the test set evaluation results to the output directory
-    test_results_filepath = os.path.join(output_filepath, "test_results.txt")
-    with open(test_results_filepath, "w") as f:
-        f.write(f"Test Set Loss: {test_val_loss:.4f}\n")
-        f.write(f"Test Set Accuracy: {test_val_accuracy:.4f}\n")
-    logger.info(f"Test set evaluation results saved to {test_results_filepath}")
+    # # Unseen test data for final evaluation
+    # test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
+    # X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
+    # logger.debug(f"Test feature matrix shape: {X_test.shape}")
+    # logger.debug(f"Test label array shape: {y_test.shape}")
+    #
+    # # Evaluate the model on the test data to avoid overfitting
+    # test_val_loss, test_val_accuracy = model.evaluate(X_test, y_test, verbose=1)
+    # logger.info(f"Test Set Loss: {test_val_loss:.4f}, Test Set Accuracy: {test_val_accuracy:.4f}")
+    #
+    # # Save the test set evaluation results to the output directory
+    # test_results_filepath = os.path.join(output_filepath, "test_results.txt")
+    # with open(test_results_filepath, "w") as f:
+    #     f.write(f"Test Set Loss: {test_val_loss:.4f}\n")
+    #     f.write(f"Test Set Accuracy: {test_val_accuracy:.4f}\n")
+    # logger.info(f"Test set evaluation results saved to {test_results_filepath}")
 
 if __name__ == '__main__':
     main()
