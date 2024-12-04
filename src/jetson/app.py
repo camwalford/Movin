@@ -2,8 +2,8 @@ from jetsoncamera import JetsonCamera, LaptopCamera
 from labeller import Labeller
 from classifier import Classifier
 from mapper import InputMapper
-from device import ConnectedDevice
 from detector import MovementDetector
+from bt_utils.keyboard import Keyboard
 
 # Classifiers
 classifiers = {
@@ -37,7 +37,7 @@ def run_app():
     detector = MovementDetector(queue_size=30, threshold=4, z_weight=1)
     classifier = Classifier(*config["classifier"])
     mapper = InputMapper(game)
-    device = ConnectedDevice()
+    keyboard = Keyboard()
 
     exercise = "idle"
     next_input = True  # Flag to check if the next input is valid
@@ -63,7 +63,7 @@ def run_app():
             print("Exercise identified:", exercise, "\nProbability:", probability)
             if exercise != "idle" and next_input:
                 key = mapper.exercise_to_key(exercise)
-                device.execute(key)
+                keyboard.send_string(key)
                 next_input = False
             if exercise == "idle":
                 next_input = True

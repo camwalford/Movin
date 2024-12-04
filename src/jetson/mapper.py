@@ -1,13 +1,11 @@
-from pynput.keyboard import Key, Controller
-
 class InputMapper:
 
     game_configs = {
         "2048": {
-            "left_lunge": Key.left,
-            "right_lunge": Key.right,
-            "jumping_jacks": Key.up,
-            "squat": Key.down,
+            "left_lunge": "%left%",
+            "right_lunge": "%right%",
+            "jumping_jacks": "%up%",
+            "squat": "%down%",
         }
     }
 
