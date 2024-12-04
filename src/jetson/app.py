@@ -10,13 +10,13 @@ cam_classifier = Classifier("models/model.h5", "models/label_encoder_h5.npy")
 # kate_classifier = Classifier("src/jetson/models/classifier.keras")
 def run_app():
     # Get game from user input
-    print("Game choices:", list(InputMapper.game_configs.keys()))
-    while True:
-        game = input("Please provide a game: ")
-        if game in InputMapper.game_configs:
-            break
-        else:
-            print("Invalid game.")
+    # print("Game choices:", list(InputMapper.game_configs.keys()))
+    # while True:
+    #     game = input("Please provide a game: ")
+    #     if game in InputMapper.game_configs:
+    #         break
+    #     else:
+    #         print("Invalid game.")
 
     # Setup classes
     camera = LaptopCamera()
