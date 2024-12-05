@@ -3,20 +3,20 @@ import pandas as pd
 from glob import glob
 import keras
 from keras import Sequential, Input
-from keras.src.callbacks import EarlyStopping
-from keras.src.layers import Dense, Dropout
-from keras.src.optimizers import Adam
+from keras.callbacks import EarlyStopping
+from keras.layers import Dense, Dropout
+from keras.optimizers import Adam
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-
 
 from src.cam.utils.custom_logger import setup_logger
 import os
 
 logger = setup_logger(__name__, "logs/keypoint_classifier", "INFO")
-REQUIRED_COLUMNS = ["movement_label"] + [f"{coord}{i}" for i in range(33) for coord in ("x", "y", "z")] # 33 keypoints
-
+REQUIRED_COLUMNS = ["movement_label"] + [f"{coord}{i}" for i in range(33) for coord in ("x", "y", "z")]  # 33 keypoints
 
 def load_data(file_path, data_format="parquet"):
     file = os.path.join(file_path, "labels." + data_format)
@@ -32,7 +32,6 @@ def load_data(file_path, data_format="parquet"):
         logger.warning(f"Missing columns in {file_path}: {missing_columns}")
     df = df[[col for col in REQUIRED_COLUMNS if col in df.columns]]
     return df
-
 
 def load_most_recent_data(base_path, movements):
     """
@@ -56,13 +55,11 @@ def load_most_recent_data(base_path, movements):
         except FileNotFoundError:
             logger.warning(f"No data found for {movement} in {most_recent_dir}")
 
-
     # Concatenate all movement DataFrames
     concatenated_df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Loaded and concatenated data for {len(movements)} movements.")
 
     return concatenated_df
-
 
 def preprocess_data(df, label_encoder=None):
     """
@@ -97,7 +94,6 @@ def preprocess_data(df, label_encoder=None):
 
     return X, y, label_encoder
 
-
 def build_model(input_shape, num_classes):
     """
     Build a simple neural network model.
@@ -123,10 +119,6 @@ def build_model(input_shape, num_classes):
         metrics=['accuracy']
     )
     return model
-
-
-
-
 
 def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32):
     """
@@ -156,7 +148,6 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
         verbose=1
     )
     return history
-
 
 def main():
     movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle"]
@@ -191,29 +182,126 @@ def main():
     label_encoder_filepath = os.path.join(output_filepath, "label_encoder.npy")
 
     os.makedirs(output_filepath, exist_ok=True)
-    os.makedirs(os.path.dirname(model_filepath), exist_ok=True)
-    os.makedirs(os.path.dirname(label_encoder_filepath), exist_ok=True)
 
     model.save(model_filepath)
     np.save(label_encoder_filepath, label_encoder.classes_)
     logger.info("Model and label encoder saved successfully.")
 
-    # # Unseen test data for final evaluation
-    # test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
-    # X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
-    # logger.debug(f"Test feature matrix shape: {X_test.shape}")
-    # logger.debug(f"Test label array shape: {y_test.shape}")
-    #
-    # # Evaluate the model on the test data to avoid overfitting
-    # test_val_loss, test_val_accuracy = model.evaluate(X_test, y_test, verbose=1)
-    # logger.info(f"Test Set Loss: {test_val_loss:.4f}, Test Set Accuracy: {test_val_accuracy:.4f}")
-    #
-    # # Save the test set evaluation results to the output directory
-    # test_results_filepath = os.path.join(output_filepath, "test_results.txt")
-    # with open(test_results_filepath, "w") as f:
-    #     f.write(f"Test Set Loss: {test_val_loss:.4f}\n")
-    #     f.write(f"Test Set Accuracy: {test_val_accuracy:.4f}\n")
-    # logger.info(f"Test set evaluation results saved to {test_results_filepath}")
+    # Unseen test data for final evaluation
+    test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
+    X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
+    logger.debug(f"Test feature matrix shape: {X_test.shape}")
+    logger.debug(f"Test label array shape: {y_test.shape}")
+
+    # Evaluate the model on the test data
+    test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=1)
+    logger.info(f"Test Set Loss: {test_loss:.4f}, Test Set Accuracy: {test_accuracy:.4f}")
+
+    # Generate predictions
+    y_pred_probs = model.predict(X_test)
+    y_pred_classes = np.argmax(y_pred_probs, axis=1)
+
+    # Generate classification report
+    class_report_dict = classification_report(y_test, y_pred_classes, target_names=label_encoder.classes_, output_dict=True)
+    class_report_str = classification_report(y_test, y_pred_classes, target_names=label_encoder.classes_)
+    logger.info(f"Classification Report:\n{class_report_str}")
+
+    # Save classification report to file
+    class_report_filepath = os.path.join(output_filepath, "classification_report.txt")
+    with open(class_report_filepath, "w") as f:
+        f.write(class_report_str)
+    logger.info(f"Classification report saved to {class_report_filepath}")
+
+    # Plot confusion matrix
+    cm = confusion_matrix(y_test, y_pred_classes)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_encoder.classes_)
+    disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical')
+    plt.title('Confusion Matrix')
+    plt.tight_layout()
+    confusion_matrix_filepath = os.path.join(output_filepath, "confusion_matrix.png")
+    plt.savefig(confusion_matrix_filepath)
+    plt.close()
+    logger.info(f"Confusion matrix saved to {confusion_matrix_filepath}")
+
+    # Plot training & validation accuracy values
+    plt.figure()
+    plt.plot(history.history['accuracy'], label='Training Accuracy')
+    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+    plt.title('Model Accuracy over Epochs')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(loc='upper left')
+    accuracy_plot_filepath = os.path.join(output_filepath, "accuracy_plot.png")
+    plt.savefig(accuracy_plot_filepath)
+    plt.close()
+    logger.info(f"Accuracy plot saved to {accuracy_plot_filepath}")
+
+    # Plot training & validation loss values
+    plt.figure()
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title('Model Loss over Epochs')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(loc='upper left')
+    loss_plot_filepath = os.path.join(output_filepath, "loss_plot.png")
+    plt.savefig(loss_plot_filepath)
+    plt.close()
+    logger.info(f"Loss plot saved to {loss_plot_filepath}")
+
+    # Plot precision, recall, and F1-score for each class
+    classes = label_encoder.classes_
+    precision = []
+    recall = []
+    f1_score = []
+
+    for cls in classes:
+        cls_report = class_report_dict[cls]
+        precision.append(cls_report['precision'])
+        recall.append(cls_report['recall'])
+        f1_score.append(cls_report['f1-score'])
+
+    # Plot Precision per class
+    plt.figure()
+    plt.bar(classes, precision, color='skyblue')
+    plt.title('Precision per Class')
+    plt.xlabel('Class')
+    plt.ylabel('Precision')
+    plt.xticks(rotation=45)
+    plt.ylim([0, 1])
+    plt.tight_layout()
+    precision_plot_filepath = os.path.join(output_filepath, "precision_per_class.png")
+    plt.savefig(precision_plot_filepath)
+    plt.close()
+    logger.info(f"Precision per class plot saved to {precision_plot_filepath}")
+
+    # Plot Recall per class
+    plt.figure()
+    plt.bar(classes, recall, color='lightgreen')
+    plt.title('Recall per Class')
+    plt.xlabel('Class')
+    plt.ylabel('Recall')
+    plt.xticks(rotation=45)
+    plt.ylim([0, 1])
+    plt.tight_layout()
+    recall_plot_filepath = os.path.join(output_filepath, "recall_per_class.png")
+    plt.savefig(recall_plot_filepath)
+    plt.close()
+    logger.info(f"Recall per class plot saved to {recall_plot_filepath}")
+
+    # Plot F1-score per class
+    plt.figure()
+    plt.bar(classes, f1_score, color='salmon')
+    plt.title('F1 Score per Class')
+    plt.xlabel('Class')
+    plt.ylabel('F1 Score')
+    plt.xticks(rotation=45)
+    plt.ylim([0, 1])
+    plt.tight_layout()
+    f1_score_plot_filepath = os.path.join(output_filepath, "f1_score_per_class.png")
+    plt.savefig(f1_score_plot_filepath)
+    plt.close()
+    logger.info(f"F1 Score per class plot saved to {f1_score_plot_filepath}")
 
 if __name__ == '__main__':
     main()
