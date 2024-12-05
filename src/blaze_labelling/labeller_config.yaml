@@ -74,3 +74,10 @@ movement_labels:
         min_angle: 100
         max_angle: 240
 
+  left_oblique:
+      joints:
+        - name: "SHOULDER"
+          side: "RIGHT"
+          min_angle: 30
+          max_angle: 200
+

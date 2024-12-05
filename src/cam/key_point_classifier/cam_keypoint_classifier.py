@@ -150,7 +150,7 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
     return history
 
 def main():
-    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle"]
+    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle", "left_oblique"]
 
     # Load and preprocess the most recent training data
     train_data = load_most_recent_data("../../blaze_labelling/labeller_output/train", movements)
