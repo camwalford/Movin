@@ -3,7 +3,7 @@ import cv2
 
 class JetsonCamera:
 
-    def __init__(self, width=640, height=480):
+    def __init__(self, width=640, height=480, fps=30):
         # Open the default camera
         self.camera = cv2.VideoCapture(0)
 
@@ -11,6 +11,9 @@ class JetsonCamera:
         if self.camera.isOpened():
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            self.camera.set(cv2.CAP_PROP_FPS, fps)
+
+
 
         else:
             self.camera = None
