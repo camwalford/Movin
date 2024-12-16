@@ -4,7 +4,7 @@ multi_label: False # Set to True if you want to generate data for all movement_l
 use_joint_angles: True # Set to True if you want to use joint angles to filter frames
 input_dir: "./labeller_input"
 output_dir: "./labeller_output"
-save_overlay_video: True # Saves video(s) with overlayed pose
+save_overlay_video: True # Saves the video(s) with an overlay showing when the joint angles match
 log_dir: "./logs/labeller"
 log_level: "INFO"
 

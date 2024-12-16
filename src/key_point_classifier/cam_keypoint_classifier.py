@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from glob import glob
-import keras
 from keras import Sequential, Input
 from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout
@@ -12,7 +11,7 @@ from sklearn.metrics import classification_report, confusion_matrix, ConfusionMa
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
-from src.cam.utils.custom_logger import setup_logger
+from src.utils.custom_logger import setup_logger
 import os
 
 logger = setup_logger(__name__, "logs/keypoint_classifier", "INFO")
@@ -153,7 +152,7 @@ def main():
     movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle", "left_oblique"]
 
     # Load and preprocess the most recent training data
-    train_data = load_most_recent_data("../../blaze_labelling/labeller_output/train", movements)
+    train_data = load_most_recent_data("../blaze_labelling/labeller_output/train", movements)
     X, y, label_encoder = preprocess_data(train_data)
 
     # Split into training and validation sets
@@ -188,7 +187,7 @@ def main():
     logger.info("Model and label encoder saved successfully.")
 
     # Unseen test data for final evaluation
-    test_data = load_most_recent_data("../../blaze_labelling/labeller_output/test", movements)
+    test_data = load_most_recent_data("../blaze_labelling/labeller_output/test", movements)
     X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
     logger.debug(f"Test feature matrix shape: {X_test.shape}")
     logger.debug(f"Test label array shape: {y_test.shape}")
