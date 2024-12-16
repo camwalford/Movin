@@ -1,7 +1,7 @@
 import cv2
 
 
-class JetsonCamera:
+class Camera:
 
     def __init__(self):
         # Open the default camera
@@ -45,6 +45,6 @@ class JetsonCamera:
 
 
 if __name__ == "__main__":
-    camera = JetsonCamera()
+    camera = Camera()
     camera.capture("image.jpg")
 

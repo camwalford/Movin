@@ -1,9 +1,8 @@
-from jetsoncamera import JetsonCamera
-from labeller import Labeller
-from classifier import Classifier
-from mapper import InputMapper
-from detector import MovementDetector
-from bt_utils.keyboard import Keyboard
+from modules.camera import Camera
+from modules.labeller import Labeller
+from modules.classifier import Classifier
+from modules.mapper import InputMapper
+from modules.detector import MovementDetector
 
 # Classifiers
 classifiers = {
@@ -16,7 +15,8 @@ config = {
     "game": "2048",  # Leave blank to get user's input
     "classifier": classifiers["cam"],
     "detector": {"queue_size": 30, "threshold": 2, "z_weight": 1},
-    "showDisplay": True
+    "showDisplay": True,
+    "keyboard": "default"
 }
 
 
@@ -33,12 +33,17 @@ def run_app():
                 print("Invalid game.")
 
     # Setup classes
-    camera = JetsonCamera()
+    camera = Camera()
     labeller = Labeller()
     detector = MovementDetector(**config["detector"])
     classifier = Classifier(*config["classifier"])
     mapper = InputMapper(game)
-    keyboard = Keyboard()
+    keyboard = None
+
+
+    # from modules.bt_utils.bluetoothkeyboard import BluetoothKeyboard
+
+    # keyboard = BluetoothKeyboard()
 
     exercise = "idle"
     next_input = True  # Flag to check if the next input is valid
@@ -63,7 +68,7 @@ def run_app():
             print("Exercise identified:", exercise, "\nProbability:", probability)
             if exercise != "idle" and next_input:
                 key = mapper.exercise_to_key(exercise)
-                keyboard.send_string(key)
+                # keyboard.send_string(key)
                 next_input = False
             if exercise == "idle":
                 next_input = True

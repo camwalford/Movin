@@ -152,7 +152,7 @@ def main():
     movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle", "left_oblique"]
 
     # Load and preprocess the most recent training data
-    train_data = load_most_recent_data("../blaze_labelling/labeller_output/train", movements)
+    train_data = load_most_recent_data("../data_labelling/labeller_output/train", movements)
     X, y, label_encoder = preprocess_data(train_data)
 
     # Split into training and validation sets
@@ -177,8 +177,8 @@ def main():
     # Save the model and label encoder to timestamped directories
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
     output_filepath = f"./keypoint_classifier_output/{timestamp}"
-    model_filepath = os.path.join(output_filepath, "model.h5")
-    label_encoder_filepath = os.path.join(output_filepath, "label_encoder.npy")
+    model_filepath = os.path.join(output_filepath, "model/model.h5")
+    label_encoder_filepath = os.path.join(output_filepath, "model/label_encoder.npy")
 
     os.makedirs(output_filepath, exist_ok=True)
 
@@ -187,7 +187,7 @@ def main():
     logger.info("Model and label encoder saved successfully.")
 
     # Unseen test data for final evaluation
-    test_data = load_most_recent_data("../blaze_labelling/labeller_output/test", movements)
+    test_data = load_most_recent_data("../data_labelling/labeller_output/test", movements)
     X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
     logger.debug(f"Test feature matrix shape: {X_test.shape}")
     logger.debug(f"Test label array shape: {y_test.shape}")
@@ -205,8 +205,10 @@ def main():
     class_report_str = classification_report(y_test, y_pred_classes, target_names=label_encoder.classes_)
     logger.info(f"Classification Report:\n{class_report_str}")
 
+    test_results_filepath = os.path.join(output_filepath, "test_results")
+    os.makedirs(test_results_filepath, exist_ok=True)
     # Save classification report to file
-    class_report_filepath = os.path.join(output_filepath, "classification_report.txt")
+    class_report_filepath = os.path.join(test_results_filepath, "classification_report.txt")
     with open(class_report_filepath, "w") as f:
         f.write(class_report_str)
     logger.info(f"Classification report saved to {class_report_filepath}")
@@ -217,7 +219,7 @@ def main():
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical')
     plt.title('Confusion Matrix')
     plt.tight_layout()
-    confusion_matrix_filepath = os.path.join(output_filepath, "confusion_matrix.png")
+    confusion_matrix_filepath = os.path.join(test_results_filepath, "confusion_matrix.png")
     plt.savefig(confusion_matrix_filepath)
     plt.close()
     logger.info(f"Confusion matrix saved to {confusion_matrix_filepath}")
@@ -230,7 +232,7 @@ def main():
     plt.ylabel('Accuracy')
     plt.xlabel('Epoch')
     plt.legend(loc='upper left')
-    accuracy_plot_filepath = os.path.join(output_filepath, "accuracy_plot.png")
+    accuracy_plot_filepath = os.path.join(test_results_filepath, "accuracy_plot.png")
     plt.savefig(accuracy_plot_filepath)
     plt.close()
     logger.info(f"Accuracy plot saved to {accuracy_plot_filepath}")
@@ -243,7 +245,7 @@ def main():
     plt.ylabel('Loss')
     plt.xlabel('Epoch')
     plt.legend(loc='upper left')
-    loss_plot_filepath = os.path.join(output_filepath, "loss_plot.png")
+    loss_plot_filepath = os.path.join(test_results_filepath, "loss_plot.png")
     plt.savefig(loss_plot_filepath)
     plt.close()
     logger.info(f"Loss plot saved to {loss_plot_filepath}")
@@ -269,7 +271,7 @@ def main():
     plt.xticks(rotation=45)
     plt.ylim([0, 1])
     plt.tight_layout()
-    precision_plot_filepath = os.path.join(output_filepath, "precision_per_class.png")
+    precision_plot_filepath = os.path.join(test_results_filepath, "precision_per_class.png")
     plt.savefig(precision_plot_filepath)
     plt.close()
     logger.info(f"Precision per class plot saved to {precision_plot_filepath}")
@@ -283,7 +285,7 @@ def main():
     plt.xticks(rotation=45)
     plt.ylim([0, 1])
     plt.tight_layout()
-    recall_plot_filepath = os.path.join(output_filepath, "recall_per_class.png")
+    recall_plot_filepath = os.path.join(test_results_filepath, "recall_per_class.png")
     plt.savefig(recall_plot_filepath)
     plt.close()
     logger.info(f"Recall per class plot saved to {recall_plot_filepath}")
@@ -297,7 +299,7 @@ def main():
     plt.xticks(rotation=45)
     plt.ylim([0, 1])
     plt.tight_layout()
-    f1_score_plot_filepath = os.path.join(output_filepath, "f1_score_per_class.png")
+    f1_score_plot_filepath = os.path.join(test_results_filepath, "f1_score_per_class.png")
     plt.savefig(f1_score_plot_filepath)
     plt.close()
     logger.info(f"F1 Score per class plot saved to {f1_score_plot_filepath}")

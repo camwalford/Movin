@@ -4,7 +4,7 @@ from time import sleep
 
 
 
-class Keyboard:
+class BluetoothKeyboard:
     """
     Send a predefined string as HID messages over the keyboard D-Bus server.
     """
@@ -17,8 +17,8 @@ class Keyboard:
         self.mod_keys = 0b00000000
         self.pressed_keys = []
         self.bus = dbus.SystemBus()
-        self.btkobject = self.bus.get_object(Keyboard.HID_DBUS, Keyboard.HID_SRVC)
-        self.btk_service = dbus.Interface(self.btkobject, Keyboard.HID_DBUS)
+        self.btkobject = self.bus.get_object(BluetoothKeyboard.HID_DBUS, BluetoothKeyboard.HID_SRVC)
+        self.btk_service = dbus.Interface(self.btkobject, BluetoothKeyboard.HID_DBUS)
 
     def update_mod_keys(self, mod_key, value):
         """
