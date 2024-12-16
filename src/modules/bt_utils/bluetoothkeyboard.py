@@ -116,7 +116,7 @@ class BluetoothKeyboard:
 
 
 if __name__ == '__main__':
-    kb = BTKeyboard()
+    kb = BluetoothKeyboard()
 
     print('Sending predefined string: "hello %up% %down% %left% %right%"')
     # kb.send_string("%up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% %up% %down% %left% %right% ")
