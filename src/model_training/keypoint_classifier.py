@@ -14,7 +14,7 @@ from sklearn.preprocessing import LabelEncoder
 from src.utils.custom_logger import setup_logger
 import os
 
-logger = setup_logger(__name__, "logs/keypoint_classifier", "INFO")
+logger = setup_logger(__name__, "src/model_training/logs/keypoint_classifier", "INFO")
 REQUIRED_COLUMNS = ["movement_label"] + [f"{coord}{i}" for i in range(33) for coord in ("x", "y", "z")]  # 33 keypoints
 
 def load_data(file_path, data_format="parquet"):
@@ -185,7 +185,7 @@ def main():
 
     # Save the model and label encoder to timestamped directories
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    output_filepath = f"src/keypoint_classifier_output/{timestamp}"
+    output_filepath = f"src/model_training/keypoint_classifier_output/{timestamp}"
     model_filepath = os.path.join(output_filepath, "model/model.h5")
     label_encoder_filepath = os.path.join(output_filepath, "model/label_encoder.npy")
 
