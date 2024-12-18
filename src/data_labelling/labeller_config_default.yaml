@@ -1,13 +1,16 @@
-# Set to the name of the single label you want to generate data for
-target_label: "right_lunge"
-multi_label: False # Set to True if you want to generate data for all movement_labels
-use_joint_angles: True # Set to True if you want to use joint angles to filter frames
+## Copy this file and rename it to labeller_config.yaml, unless specifically making
+## changes to the default configuration.
+## i.e. This should be the only configuration file in the repository.
+
+
+multi_label: True # Set to True if you want to generate data for all movement_labels
+target_label: "right_lunge" # if multi_label is False, this is the label to generate data for
+use_joint_angles: True # Set to False if you want to label all video frames
 input_dir: "./labeller_input"
 output_dir: "./labeller_output"
 save_overlay_video: True # Saves the video(s) with an overlay showing when the joint angles match
 log_dir: "./logs/labeller"
 log_level: "INFO"
-
 blaze_settings:
   static_image_mode: False
   model_complexity: 1
@@ -18,10 +21,11 @@ blaze_settings:
   min_tracking_confidence: 0.5
 
 
-#     - name: "KNEE" # maps to angle between hip-knee-ankle
-#     - name: "ELBOW" # maps to angle between shoulder-elbow-wrist
-#     - name: "SHOULDER" # maps to using angle between elbow-shoulder-hip
-#     - name: "HIP" # maps to using angle between shoulder-hip-knee
+## Specify the movement labels and the joint angles that define them
+##  - name: "KNEE" # maps to angle between hip-knee-ankle
+##  - name: "ELBOW" # maps to angle between shoulder-elbow-wrist
+##  - name: "SHOULDER" # maps to using angle between elbow-shoulder-hip
+##  - name: "HIP" # maps to using angle between shoulder-hip-knee
 movement_labels:
   jumping_jacks:
     joints: # joint angle thresholds to define the movements KNEE, ELBOW, SHOULDER, HIP
