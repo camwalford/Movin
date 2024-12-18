@@ -46,18 +46,27 @@ def load_most_recent_data(base_path, movements):
     dfs = []
     for movement in movements:
         movement_path = os.path.join(base_path, movement)
-        most_recent_dir = max(glob(movement_path + "/*"), key=os.path.getctime)
+        logger.info(f"Loading data for {movement} from {movement_path}")
+
+        # Get all matching files/directories
+        paths = glob(movement_path + "/*")
+        if not paths:
+            logger.warning(f"No data found for {movement} in {movement_path}")
+            continue
+
+        most_recent_dir = max(paths, key=os.path.getctime)
         logger.info(f"Loading data from {most_recent_dir}")
         try:
             df = load_data(most_recent_dir)
             dfs.append(df)
         except FileNotFoundError:
-            logger.warning(f"No data found for {movement} in {most_recent_dir}")
+            logger.warning(f"No data file found for {movement} in {most_recent_dir}")
 
-    # Concatenate all movement DataFrames
+    if not dfs:
+        raise ValueError("No valid data found for any of the specified movements.")
+
     concatenated_df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Loaded and concatenated data for {len(movements)} movements.")
-
     return concatenated_df
 
 def preprocess_data(df, label_encoder=None):
@@ -152,7 +161,7 @@ def main():
     movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle", "left_oblique"]
 
     # Load and preprocess the most recent training data
-    train_data = load_most_recent_data("../data_labelling/labeller_output/train", movements)
+    train_data = load_most_recent_data("src/data_labelling/labeller_output/train", movements)
     X, y, label_encoder = preprocess_data(train_data)
 
     # Split into training and validation sets
@@ -176,7 +185,7 @@ def main():
 
     # Save the model and label encoder to timestamped directories
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    output_filepath = f"./keypoint_classifier_output/{timestamp}"
+    output_filepath = f"src/keypoint_classifier_output/{timestamp}"
     model_filepath = os.path.join(output_filepath, "model/model.h5")
     label_encoder_filepath = os.path.join(output_filepath, "model/label_encoder.npy")
 
@@ -187,7 +196,7 @@ def main():
     logger.info("Model and label encoder saved successfully.")
 
     # Unseen test data for final evaluation
-    test_data = load_most_recent_data("../data_labelling/labeller_output/test", movements)
+    test_data = load_most_recent_data("src/data_labelling/labeller_output/test", movements)
     X_test, y_test, _ = preprocess_data(test_data, label_encoder=label_encoder)
     logger.debug(f"Test feature matrix shape: {X_test.shape}")
     logger.debug(f"Test label array shape: {y_test.shape}")
