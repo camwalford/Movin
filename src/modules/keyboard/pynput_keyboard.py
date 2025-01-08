@@ -1,12 +1,12 @@
 # pynput_keyboard.py
-from pynput.keyboard import Controller, Key
+from pynput.keyboard import Controller
 from time import sleep
 from .base_keyboard import BaseKeyboard
-from .pynput_keymap import pynput_convert
+from .pynput_keymap import *
 
 class PynputKeyboard(BaseKeyboard):
     def __init__(self):
-        super().__init__(target_length=6)
+        super().__init__(pynput_keymap, target_length=6)
         self.keyboard = Controller()
 
     def send_string(self, text):

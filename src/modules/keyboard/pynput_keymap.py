@@ -92,7 +92,11 @@ def pynput_convert(key_name):
     Returns either a string or a Key constant.
     Returns None if no mapping is found.
     """
-    return pynput_keymap.get(key_name, None)
+    print(f"Converting {key_name} to pynput key")
+    key = pynput_keymap.get(key_name, None)
+    if key is None:
+        print(f"No mapping found for {key_name}")
+    return key
 
 
 def pynput_modkey(key_name):
