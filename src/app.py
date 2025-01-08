@@ -3,6 +3,9 @@ from modules.labeller import Labeller
 from modules.classifier import Classifier
 from modules.mapper import InputMapper
 from modules.detector import MovementDetector
+from src.modules.keyboard.pynput_keyboard import PynputKeyboard
+
+
 
 # Classifiers
 classifiers = {
@@ -43,7 +46,7 @@ def run_app():
 
     # from modules.bt_utils.bluetoothkeyboard import BluetoothKeyboard
 
-    # keyboard = BluetoothKeyboard()
+    keyboard = PynputKeyboard()
 
     exercise = "idle"
     next_input = True  # Flag to check if the next input is valid
@@ -68,7 +71,7 @@ def run_app():
             print("Exercise identified:", exercise, "\nProbability:", probability)
             if exercise != "idle" and next_input:
                 key = mapper.exercise_to_key(exercise)
-                # keyboard.send_string(key)
+                keyboard.send_string(key)
                 next_input = False
             if exercise == "idle":
                 next_input = True
