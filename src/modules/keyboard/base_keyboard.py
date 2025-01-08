@@ -1,15 +1,11 @@
-
-
-# src/modules/base_keyboard.py
 import time
 
 class BaseKeyboard:
-    def __init__(self, target_length=6):
+    def __init__(self, keymap, target_length=6):
         self.target_length = target_length
+        self.keymap = keymap
         self.mod_keys = 0b00000000
         self.pressed_keys = []
-        # keymap might be shared or provided by subclasses
-        # self.keymap = ...
 
     def update_mod_keys(self, mod_key, value):
         """
@@ -92,7 +88,6 @@ class BaseKeyboard:
 
     def convert_key(self, key_name):
         # Convert a key name (e.g. "KEY_A") to its code using self.keymap
-        # To be implemented by subclass or assume keymap is global.
         return self.keymap.convert(key_name)
 
     def send_current_keys(self):
