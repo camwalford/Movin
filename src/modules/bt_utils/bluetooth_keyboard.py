@@ -1,7 +1,7 @@
 # src/modules/bluetooth_keyboard.py
 import dbus
 
-from src.modules.base_keyboard import BaseKeyboard
+from src.modules.keyboard.base_keyboard import BaseKeyboard
 from src.modules.bt_utils import keymap
 
 class BluetoothKeyboard(BaseKeyboard):
@@ -13,7 +13,7 @@ class BluetoothKeyboard(BaseKeyboard):
         self.bus = dbus.SystemBus()
         self.btkobject = self.bus.get_object(BluetoothKeyboard.HID_DBUS, BluetoothKeyboard.HID_SRVC)
         self.btk_service = dbus.Interface(self.btkobject, BluetoothKeyboard.HID_DBUS)
-        self.keymap = keymap  # Assume keymap is a module with a convert method.
+        self.keymap = keymap
 
     @property
     def state(self):
