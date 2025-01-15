@@ -68,6 +68,87 @@ class BlazePoseVideoLabeller:
         except Exception as e:
             self.logger.exception(f"An error occurred while processing videos: {e}")
 
+    def process_webcam_input(self, label_name, joint_angles):
+        """
+        Processes a live webcam feed to extract frames, landmarks, and optionally joint angles in real-time. Optionally saves frames and appends label data if they match the specified angle thresholds.
+
+        Args:
+            label_name (str): Label associated with the video.
+            joint_angles (list): List of joint angle configurations.
+        """
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            self.logger.error("Failed to open webcam feed.")
+            return
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        frames_output_dir = os.path.join(self.output_dir, 'webcam', label_name, timestamp, 'frames')
+        os.makedirs(frames_output_dir, exist_ok=True)
+
+        labels_data = []
+        overlay_writer = None
+        frame_index = 0
+
+        if self.save_overlay_video:
+            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30
+
+            overlay_video_path = os.path.join(self.output_dir, 'webcam', label_name, timestamp, f'overlay_{label_name}.mp4')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            overlay_writer = cv2.VideoWriter(overlay_video_path, fourcc, fps, (frame_width, frame_height))
+
+        self.logger.info(f"Processing webcam feed for label '{label_name}'...")
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                self.logger.error("Failed to read from webcam. Exiting loop.")
+                break
+
+            frame_index += 1
+            self.global_frame_count += 1
+
+            # Re-use your existing per-frame logic
+            # Instead of calling "process_video()", call "_process_frame()" directly
+            processed_frame = self._process_frame(
+                frame=frame,
+                video_name="webcam",  # arbitrary identifier
+                frames_output_dir=frames_output_dir,
+                labels_data=labels_data,
+                label_name=label_name,
+                joint_angles=joint_angles
+            )
+
+            if self.save_overlay_video and overlay_writer is not None:
+                overlay_writer.write(processed_frame)
+
+            # Display the processed frame in a window
+            cv2.imshow("Webcam BlazePose", processed_frame)
+
+            # Break if user presses 'q'
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                self.logger.info("User pressed 'q'. Exiting webcam loop.")
+                break
+
+            # Cleanup
+        cap.release()
+        if overlay_writer is not None:
+            overlay_writer.release()
+        cv2.destroyAllWindows()
+
+        # If you want to save the labels_data from the webcam session to Parquet:
+        if labels_data:
+            labels_parquet_path = os.path.join(self.output_dir, "webcam", label_name, timestamp, "labels.parquet")
+            df_labels = pd.DataFrame(labels_data)
+            try:
+                df_labels.to_parquet(labels_parquet_path, index=False)
+                self.logger.info(f"Saved webcam labels to {labels_parquet_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to save Parquet file {labels_parquet_path}: {e}")
+
+        self.logger.info("Webcam processing finished.")
+
     def _adjust_labels_based_on_config(self):
         """
         Adjusts self.labels based on whether multi_label is disabled and a target_label is specified.
@@ -753,7 +834,18 @@ def main():
             config = yaml.safe_load(file)
 
         processor = BlazePoseVideoLabeller(config)
-        processor.process_all_videos()
+
+        if config.get("use_webcam", False):
+            # If you want to capture data for a specific label
+            target_label = config.get('target_label', 'idle')
+            # Grab that label's joint configuration
+            label_data = config['movement_labels'].get(target_label, {})
+            joint_angles = label_data.get('joints', [])
+
+            processor.process_webcam_input(label_name=target_label, joint_angles=joint_angles)
+
+        else:
+            processor.process_all_videos()
 
     except Exception as e:
         logging.basicConfig(level=logging.ERROR)

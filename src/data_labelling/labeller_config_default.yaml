@@ -3,9 +3,10 @@
 ## i.e. This should be the only configuration file in the repository.
 
 
-multi_label: True # Set to True if you want to generate data for all movement_labels
-target_label: "right_lunge" # if multi_label is False, this is the label to generate data for
+multi_label: False # Set to True if you want to generate data for all movement_labels
+target_label: "right_arm_vertical" # if multi_label is False, this is the label to generate data for
 use_joint_angles: True # Set to False if you want to label all video frames
+use_webcam: True
 input_dir: "./labeller_input"
 output_dir: "./labeller_output"
 save_overlay_video: True # Saves the video(s) with an overlay showing when the joint angles match
@@ -83,5 +84,12 @@ movement_labels:
         - name: "SHOULDER"
           side: "RIGHT"
           min_angle: 30
+          max_angle: 200
+
+  right_arm_vertical:
+      joints:
+        - name: "SHOULDER"
+          side: "RIGHT"
+          min_angle: 150
           max_angle: 200
 
