@@ -83,8 +83,16 @@ movement_labels:
       joints:
         - name: "SHOULDER"
           side: "RIGHT"
-          min_angle: 30
+          min_angle: 60
           max_angle: 200
+
+
+  right_oblique:
+    joints:
+      - name: "SHOULDER"
+        side: "LEFT"
+        min_angle: 60
+        max_angle: 200
 
   right_arm_vertical:
       joints:
@@ -93,3 +101,82 @@ movement_labels:
           min_angle: 150
           max_angle: 200
 
+  left_arm_vertical:
+        joints:
+          - name: "SHOULDER"
+            side: "LEFT"
+            min_angle: 150
+            max_angle: 200
+
+  clap:
+    joints:
+      - name: "ELBOW"
+        side: "BOTH"
+        min_angle: 0
+        max_angle: 150
+
+  right_front_raise:
+    joints:
+      - name: "SHOULDER"
+        side: "RIGHT"
+        min_angle: 50
+        max_angle: 120
+
+  left_front_raise:
+    joints:
+      - name: "SHOULDER"
+        side: "LEFT"
+        min_angle: 50
+        max_angle: 120
+
+  right_high_knee:
+    joints:
+      - name: "KNEE"
+        side: "RIGHT"
+        min_angle: 0
+        max_angle: 160
+      - name: "KNEE"
+        side: "LEFT"
+        min_angle: 150
+        max_angle: 210
+
+  left_high_knee:
+    joints:
+      - name: "KNEE"
+        side: "LEFT"
+        min_angle: 0
+        max_angle: 160
+      - name: "KNEE"
+        side: "RIGHT"
+        min_angle: 150
+        max_angle: 210
+
+  right_kick:
+      joints:
+        - name: "KNEE"
+          side: "RIGHT"
+          min_angle: 0
+          max_angle: 160
+        - name: "KNEE"
+          side: "LEFT"
+          min_angle: 150
+          max_angle: 210
+
+
+  left_kick:
+      joints:
+        - name: "KNEE"
+          side: "LEFT"
+          min_angle: 0
+          max_angle: 160
+        - name: "KNEE"
+          side: "RIGHT"
+          min_angle: 150
+          max_angle: 210
+
+  hip_bend:
+        joints:
+          - name: "HIP"
+            side: "BOTH"
+            min_angle: 0
+            max_angle: 120
