@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import mediapipe as mp
 import os
@@ -820,6 +822,141 @@ class BlazePoseVideoLabeller:
         except Exception as e:
             self.logger.exception(f"Failed to save frame and labels for frame {self.global_frame_count}: {e}")
 
+    def create_webcam_data(self, record_duration=30):
+        """
+        Records webcam data for each label (movement) in the config.
+        Prompts the user before each recording and records for both
+        the 'train' and 'test' sets, each for `record_duration` seconds.
+
+        Args:
+            record_duration (int): Number of seconds to record for each set.
+        """
+        # If you have disabled multi_label in the config and specified a target_label,
+        # self.labels might be trimmed to just the target_label. Otherwise, it will
+        # contain all movements.
+        for label_name, label_data in self.labels.items():
+            joint_angles = label_data.get('joints', [])
+
+            # -- TRAIN RECORDING --
+            input(f"\nGet ready to record {record_duration}s of WEBCAM data for TRAIN: '{label_name}'. "
+                  f"Press Enter to start recording...")
+            self._record_webcam_for_label(
+                label_name=label_name,
+                joint_angles=joint_angles,
+                dataset_type='train',
+                record_duration=record_duration
+            )
+
+            # -- TEST RECORDING --
+            input(f"\nGet ready to record {record_duration}s of WEBCAM data for TEST: '{label_name}'. "
+                  f"Press Enter to start recording...")
+            self._record_webcam_for_label(
+                label_name=label_name,
+                joint_angles=joint_angles,
+                dataset_type='test',
+                record_duration=record_duration
+            )
+
+        # ---------------------------------------------
+        # 2) Add the helper function that records for a fixed duration.
+        # ---------------------------------------------
+
+    def _record_webcam_for_label(self, label_name, joint_angles, dataset_type, record_duration=30):
+        """
+        Captures webcam footage for a fixed duration, applies pose detection,
+        and saves frames & labels just like in `process_webcam_input`, but
+        organized into a 'train' or 'test' folder.
+
+        Args:
+            label_name (str): The label (movement) name from the config.
+            joint_angles (list): The joint configurations for that label.
+            dataset_type (str): Typically 'train' or 'test'.
+            record_duration (int): Number of seconds to record from the webcam.
+        """
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            self.logger.error("Failed to open webcam feed.")
+            return
+
+        # Re-use your existing output directory logic so data is stored under:
+        #   <output_dir>/<dataset_type>/<label_name>/<timestamp>/{frames, labels.parquet, overlay etc.}
+        input_dataset_dir, output_dataset_dir, frames_output_dir, labels_parquet_path, overlay_video_base = \
+            self._setup_output_directories(label_name, dataset_type)
+
+        labels_data = []
+        overlay_writer = None
+        frame_index = 0
+
+        # Attempt to gather camera properties
+        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+
+        # If we are saving overlay videos, initialize the writer
+        if self.save_overlay_video:
+            # e.g. "overlay_<label_name>_webcam.mp4"
+            overlay_video_path = f"{overlay_video_base}_webcam.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            overlay_writer = cv2.VideoWriter(
+                overlay_video_path, fourcc, fps,
+                (frame_width, frame_height)
+            )
+
+        self.logger.info(f"Recording webcam for label '{label_name}' in {dataset_type} set for {record_duration}s...")
+
+        start_time = time.time()
+        while True:
+            # End loop if recording time is reached
+            elapsed = time.time() - start_time
+            if elapsed >= record_duration:
+                self.logger.info(f"Reached {record_duration}s for label '{label_name}'. Stopping recording.")
+                break
+
+            ret, frame = cap.read()
+            if not ret:
+                self.logger.error("Failed to read from webcam. Exiting loop.")
+                break
+
+            frame_index += 1
+            self.global_frame_count += 1
+
+            # Re-use per-frame logic
+            processed_frame = self._process_frame(
+                frame=frame,
+                video_name="webcam",  # an arbitrary name
+                frames_output_dir=frames_output_dir,
+                labels_data=labels_data,
+                label_name=label_name,
+                joint_angles=joint_angles
+            )
+
+            if self.save_overlay_video and overlay_writer is not None:
+                overlay_writer.write(processed_frame)
+
+            # Optionally show the frame so user can see progress
+            cv2.imshow("Webcam BlazePose", processed_frame)
+            # Allow user to quit early by pressing 'q'
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                self.logger.info("User pressed 'q'. Exiting webcam loop early.")
+                break
+
+        # Cleanup
+        cap.release()
+        if overlay_writer is not None:
+            overlay_writer.release()
+        cv2.destroyAllWindows()
+
+        # Save Parquet of all frames that matched
+        if labels_data:
+            try:
+                df_labels = pd.DataFrame(labels_data)
+                df_labels.to_parquet(labels_parquet_path, index=False)
+                self.logger.info(f"Saved webcam labels to {labels_parquet_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to save Parquet file {labels_parquet_path}: {e}")
+        else:
+            self.logger.warning(f"No labels data collected for {label_name} in {dataset_type} from the webcam.")
+
 
 def main():
     """
@@ -837,13 +974,13 @@ def main():
 
         if config.get("use_webcam", False):
             # If you want to capture data for a specific label
-            target_label = config.get('target_label', 'idle')
-            # Grab that label's joint configuration
-            label_data = config['movement_labels'].get(target_label, {})
-            joint_angles = label_data.get('joints', [])
-
-            processor.process_webcam_input(label_name=target_label, joint_angles=joint_angles)
-
+            # target_label = config.get('target_label', 'idle')
+            # # Grab that label's joint configuration
+            # label_data = config['movement_labels'].get(target_label, {})
+            # joint_angles = label_data.get('joints', [])
+            #
+            # processor.process_webcam_input(label_name=target_label, joint_angles=joint_angles)
+            processor.create_webcam_data(record_duration=30)
         else:
             processor.process_all_videos()
 
