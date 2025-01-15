@@ -158,7 +158,25 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32)
     return history
 
 def main():
-    movements = ["jumping_jacks", "squat", "right_lunge", "left_lunge", "idle", "left_oblique"]
+    movements = [
+    "jumping_jacks",
+    "right_lunge",
+    "left_lunge",
+    "squat",
+    "idle",
+    "left_oblique",
+    "right_oblique",
+    "right_arm_vertical",
+    "left_arm_vertical",
+    "clap",
+    "right_front_raise",
+    "left_front_raise",
+    "right_high_knee",
+    "left_high_knee",
+    "right_kick",
+    "left_kick",
+    "hip_bend"
+    ]
 
     # Load and preprocess the most recent training data
     train_data = load_most_recent_data("src/data_labelling/labeller_output/train", movements)
